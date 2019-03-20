@@ -17,12 +17,12 @@ LIST_USERS_CMD = "ps aux | grep java | cut -d' ' -f1 | uniq | tail -1"
 
 
 @pytest.fixture(scope='module')
-def configure_security():
+def configure_multiple_users_security():
     yield from utils.spark_security_session(users=["nobody", "root"], service_names=[SERVICE_NAME])
 
 
 @pytest.fixture()
-def setup_spark(configure_security, configure_universe, use_ucr_containerizer, user):
+def setup_spark(configure_multiple_users_security, configure_universe, use_ucr_containerizer, user):
     options = {
         "service": {
             "name": SERVICE_NAME,

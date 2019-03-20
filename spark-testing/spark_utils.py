@@ -336,9 +336,11 @@ def spark_security_session(users=[SPARK_USER], service_names=[SPARK_SERVICE_NAME
         log.info('Finished cleaning up strict-mode security for Spark')
 
     try:
+        if not sdk_utils.is_open_dcos():
+            sdk_security.install_enterprise_cli()
+
         if sdk_utils.is_strict_mode():
             setup_security()
-            sdk_security.install_enterprise_cli()
         yield
     finally:
         if sdk_utils.is_strict_mode():
