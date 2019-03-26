@@ -98,6 +98,14 @@ func (suite *CliTestSuite) TestProcessJarsFlag() {
 	actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
 	assert.Equal(suite.T(), expected, actual)
 }
+
+func (suite *CliTestSuite) TestProcessJarsFlagIfJarsWordInAppPath() {
+	inputArgs := []string{"--conf spark.cores.max=8", "app/jars/main.jar", "100"}
+	expected := []string{"--conf spark.cores.max=8", "app/jars/main.jar", "100"}
+	actual := processJarsFlag(inputArgs)
+	assert.Equal(suite.T(), expected, actual)
+}
+
 func (suite *CliTestSuite) TestProcessMultiJarsFlag() {
 	_, args := sparkSubmitArgSetup()
 	inputArgs := "--conf spark.cores.max=8 --jars=http://one.jar,http://two.jar main.jar 100"
