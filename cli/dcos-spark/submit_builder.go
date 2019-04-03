@@ -221,6 +221,10 @@ Args:
 	val.flag(submit).StringVar(&val.s)
 	args.stringVals = append(args.stringVals, val)
 
+	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of colon-separated package names and versions to be downloaded on the driver and executor classpaths.")
+        val.flag(submit).StringVar(&val.s)
+        args.stringVals = append(args.stringVals, val)
+
 	val = newSparkVal("py-files", "spark.submit.pyFiles", "Add .py, .zip or .egg files to "+
 		"be distributed with your application. If you depend on multiple Python files we recommend packaging them "+
 		"into a .zip or .egg.")
