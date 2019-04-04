@@ -119,7 +119,6 @@ appears to be client mode only? doesn't seem to be used in POST submit call at a
 - proxyUser:              --proxy-user SOMENAME
 client mode only (downloads jars to local system, wouldn't work for POST call):
 - ivyRepoPath:            (spark.jars.ivy)
-- packages:               --packages maven,coordinates,for,jars (spark.jars.packages)
 - packagesExclusions:     --exclude-packages groupId:artifactId,toExclude:fromClasspath (spark.jars.excludes)
 - repositories:           --repositories additional.remote,repositories.to.search
 yarn only (note: principal/tgt/keytab are supported in patched spark):
@@ -221,7 +220,7 @@ Args:
 	val.flag(submit).StringVar(&val.s)
 	args.stringVals = append(args.stringVals, val)
 
-	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of colon-separated package names and versions to be downloaded on the driver and executor classpaths.")
+	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of package names to be downloaded on the driver and executor classpaths.")
         val.flag(submit).StringVar(&val.s)
         args.stringVals = append(args.stringVals, val)
 
