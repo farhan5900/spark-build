@@ -21,7 +21,6 @@ const keytabPrefixed = "__dcos_base64__keytab"
 const keytab = "keytab"
 const sparkAuthSecret = "spark-auth-secret"
 const marathonAppId = "spark-app"
-const sparkPackages = "group.one.id:artifact-one-id:version.one,group.two.id:artifact-two-id:version.two"
 
 var marathonConfig = map[string]interface{}{"app": map[string]interface{}{"id": marathonAppId}}
 
@@ -366,6 +365,7 @@ func (suite *CliTestSuite) TestSaslSecret() {
 }
 
 func (suite *CliTestSuite) TestPackagesFlag() {
+	sparkPackages := "group.one.id:artifact-one-id:version.one,group.two.id:artifact-two-id:version.two"
 	inputArgs := fmt.Sprintf(
 		"--packages %s "+
 		"--class %s "+
@@ -374,28 +374,22 @@ func (suite *CliTestSuite) TestPackagesFlag() {
 	cmd := createCommand(inputArgs, image)
         payload, err := buildSubmitJson(&cmd, marathonConfig)
 
-        m := make(map[string]interface{})
+        jsonMap := make(map[string]interface{})
 
-        json.Unmarshal([]byte(payload), &m)
+        json.Unmarshal([]byte(payload), &jsonMap)
 
         if err != nil {
                 suite.T().Errorf("%s", err.Error())
         }
 
         stringProps := map[string]string{
-                "spark.mesos.task.labels":                    fmt.Sprintf("DCOS_SPACE:%s", marathonAppId),
-                "spark.ssl.noCertVerification":               "true",
-                "spark.executor.memory":                      "1G", // default
-                "spark.submit.deployMode":                    "cluster",
-                "spark.mesos.driver.labels":                  fmt.Sprintf("DCOS_SPACE:%s", marathonAppId),
-		"spark.jars.packages":                        sparkPackages,
-                "spark.jars":                                 appJar,
+		"spark.jars.packages": sparkPackages,
         }
 
-        v, ok := m["sparkProperties"].(map[string]interface{})
+        sparkProps, ok := jsonMap["sparkProperties"].(map[string]interface{})
         if !ok {
                 suite.T().Errorf("%+v", ok)
         }
 
-        suite.checkProps(v, stringProps)
+        suite.checkProps(sparkProps, stringProps)
 }

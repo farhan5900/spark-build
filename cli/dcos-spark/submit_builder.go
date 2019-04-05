@@ -220,7 +220,7 @@ Args:
 	val.flag(submit).StringVar(&val.s)
 	args.stringVals = append(args.stringVals, val)
 
-	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of package names to be downloaded on the driver and executor classpaths.")
+	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of package names (i.e. maven coordinates) to be downloaded on the driver and executor classpaths.")
         val.flag(submit).StringVar(&val.s)
         args.stringVals = append(args.stringVals, val)
 
