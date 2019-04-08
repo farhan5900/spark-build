@@ -175,6 +175,17 @@ def test_jars_flag(service_name=utils.SPARK_SERVICE_NAME):
         args=["--jars {}".format(uploadedJarUrl),
               "--class MultiConfs"])
 
+@pytest.mark.sanity
+def test_packages_flag(service_name=utils.SPARK_SERVICE_NAME):
+    utils.run_tests(
+        app_url=utils.dcos_test_jar_url(),
+        app_args="20",
+        expected_output="The sum of 20 numbers is 210",
+        service_name=service_name,
+        args=["--conf spark.mesos.containerizer=mesos",
+              "--packages com.google.guava:guava:23.0",
+              "--class ProvidedPackages"])
+
 
 @pytest.mark.sanity
 @pytest.mark.smoke
