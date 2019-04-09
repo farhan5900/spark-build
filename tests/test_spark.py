@@ -183,6 +183,7 @@ def test_packages_flag(service_name=utils.SPARK_SERVICE_NAME):
         expected_output="The sum of 20 numbers is 210",
         service_name=service_name,
         args=["--conf spark.mesos.containerizer=mesos",
+              "--conf spark.jars.ivy=/mnt/mesos/sandbox/.ivy2",
               "--packages com.google.guava:guava:23.0",
               "--class ProvidedPackages"])
 

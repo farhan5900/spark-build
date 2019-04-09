@@ -220,7 +220,9 @@ Args:
 	val.flag(submit).StringVar(&val.s)
 	args.stringVals = append(args.stringVals, val)
 
-	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of package names (i.e. maven coordinates) to be downloaded on the driver and executor classpaths.")
+	val = newSparkVal("packages", "spark.jars.packages", "Comma-separated list of maven coordinates of jars to include "+
+                "on the driver and executor classpaths. Will search the local maven repo, then maven central and any additional remote "+
+                "repositories given by --repositories. The format for the coordinates should be groupId:artifactId:version")
         val.flag(submit).StringVar(&val.s)
         args.stringVals = append(args.stringVals, val)
 
