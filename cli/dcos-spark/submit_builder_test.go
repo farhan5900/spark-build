@@ -21,6 +21,7 @@ const keytabPrefixed = "__dcos_base64__keytab"
 const keytab = "keytab"
 const sparkAuthSecret = "spark-auth-secret"
 const marathonAppId = "spark-app"
+const mesosSandbox = "/mnt/mesos/sandbox"
 
 var marathonConfig = map[string]interface{}{"app": map[string]interface{}{"id": marathonAppId}}
 
@@ -92,8 +93,8 @@ func (suite *CliTestSuite) TestProcessJarsFlag() {
 	expected := []string{"--conf=spark.cores.max=8",
 		"--jars=http://one.jar",
 		"--conf=spark.mesos.uris=http://one.jar",
-		"--conf=spark.driver.extraClassPath=/mnt/mesos/sandbox/one.jar",
-		"--conf=spark.executor.extraClassPath=/mnt/mesos/sandbox/one.jar",
+		"--conf=spark.driver.extraClassPath=" + mesosSandbox + "/one.jar",
+		"--conf=spark.executor.extraClassPath=" + mesosSandbox + "/one.jar",
 		"app/jars/main.jar"}
 	actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
 	assert.Equal(suite.T(), expected, actual)
@@ -105,23 +106,57 @@ func (suite *CliTestSuite) TestProcessMultiJarsFlag() {
 	expected := []string{"--conf=spark.cores.max=8",
 		"--jars=http://one.jar,http://two.jar",
 		"--conf=spark.mesos.uris=http://one.jar,http://two.jar",
-		"--conf=spark.driver.extraClassPath=/mnt/mesos/sandbox/one.jar:/mnt/mesos/sandbox/two.jar",
-		"--conf=spark.executor.extraClassPath=/mnt/mesos/sandbox/one.jar:/mnt/mesos/sandbox/two.jar",
+		"--conf=spark.driver.extraClassPath=" + mesosSandbox + "/one.jar:" + mesosSandbox + "/two.jar",
+		"--conf=spark.executor.extraClassPath=" + mesosSandbox + "/one.jar:" + mesosSandbox + "/two.jar",
 		"main.jar"}
 	actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
 	assert.Equal(suite.T(), expected, actual)
 }
+
 func (suite *CliTestSuite) TestProcessMultiJarsFlagWithSpace() {
 	_, args := sparkSubmitArgSetup()
 	inputArgs := "--conf spark.cores.max=8 --jars http://one.jar,http://two.jar main.jar 100"
 	expected := []string{"--conf=spark.cores.max=8",
 		"--jars=http://one.jar,http://two.jar",
 		"--conf=spark.mesos.uris=http://one.jar,http://two.jar",
-		"--conf=spark.driver.extraClassPath=/mnt/mesos/sandbox/one.jar:/mnt/mesos/sandbox/two.jar",
-		"--conf=spark.executor.extraClassPath=/mnt/mesos/sandbox/one.jar:/mnt/mesos/sandbox/two.jar",
+		"--conf=spark.driver.extraClassPath=" + mesosSandbox + "/one.jar:" + mesosSandbox + "/two.jar",
+		"--conf=spark.executor.extraClassPath=" + mesosSandbox + "/one.jar:" + mesosSandbox + "/two.jar",
 		"main.jar"}
 	actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
 	assert.Equal(suite.T(), expected, actual)
+}
+
+func (suite *CliTestSuite) TestProcessPackagesFlag() {
+	_, args := sparkSubmitArgSetup()
+        inputArgs := "--conf spark.cores.max=8 --packages=groupid:artifactid:version app/packages/main.jar 100"
+        expected := []string{"--conf=spark.cores.max=8",
+                "--packages=groupid:artifactid:version",
+                "--conf=spark.jars.ivy=" + mesosSandbox + "/.ivy2",
+                "app/packages/main.jar"}
+        actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
+        assert.Equal(suite.T(), expected, actual)
+}
+
+func (suite *CliTestSuite) TestProcessMultiPackagesFlag() {
+        _, args := sparkSubmitArgSetup()
+        inputArgs := "--conf spark.cores.max=8 --packages=groupid1:artifactid1:version1,groupid2:artifactid2:version2 app/packages/main.jar 100"
+        expected := []string{"--conf=spark.cores.max=8",
+                "--packages=groupid1:artifactid1:version1,groupid2:artifactid2:version2",
+                "--conf=spark.jars.ivy=" + mesosSandbox + "/.ivy2",
+                "app/packages/main.jar"}
+        actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
+        assert.Equal(suite.T(), expected, actual)
+}
+
+func (suite *CliTestSuite) TestProcessMultiPackagesFlagWithSpace() {
+        _, args := sparkSubmitArgSetup()
+        inputArgs := "--conf spark.cores.max=8 --packages groupid1:artifactid1:version1,groupid2:artifactid2:version2 app/packages/main.jar 100"
+        expected := []string{"--conf=spark.cores.max=8",
+                "--packages=groupid1:artifactid1:version1,groupid2:artifactid2:version2",
+                "--conf=spark.jars.ivy=" + mesosSandbox + "/.ivy2",
+                "app/packages/main.jar"}
+        actual, _ := transformSubmitArgs(inputArgs, args.boolVals)
+        assert.Equal(suite.T(), expected, actual)
 }
 
 func (suite *CliTestSuite) TestIsSparkApp() {
@@ -383,6 +418,7 @@ func (suite *CliTestSuite) TestPackagesFlag() {
         }
 
         stringProps := map[string]string{
+		"spark.jars.ivy": mesosSandbox + "/.ivy2",
 		"spark.jars.packages": sparkPackages,
         }
 

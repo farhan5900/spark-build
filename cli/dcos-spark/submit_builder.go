@@ -305,6 +305,7 @@ func transformSubmitArgs(argsStr string, boolVals []*sparkVal) ([]string, []stri
 	sparkArgs, appArgs := make([]string, 0), make([]string, 0)
 
 	args = processJarsFlag(args)
+        args = processPackagesFlag(args)
 
 LOOP:
 	for i := 0; i < len(args); {
@@ -376,6 +377,30 @@ func processJarsFlag(args []string) []string {
 			jarPaths := strings.Join(jarNames, ":/mnt/mesos/sandbox/")
 			newArgs = append(newArgs, "--conf", "spark.driver.extraClassPath=/mnt/mesos/sandbox/"+jarPaths)
 			newArgs = append(newArgs, "--conf", "spark.executor.extraClassPath=/mnt/mesos/sandbox/"+jarPaths)
+			newArgs = append(newArgs, args[i+1:]...)
+			break
+		}
+	}
+	if len(newArgs) > 0 {
+		return newArgs
+	}
+	return args
+}
+
+// Special handling of '--packages' flag
+// Adds additional flag to set ivy user directory to instruct Spark to download jars to sandbox
+func processPackagesFlag(args []string) []string {
+	var newArgs []string
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "--packages") {
+			if strings.Contains(args[i], "=") {
+				newArgs = append(newArgs, args[:i+1]...)
+			} else {
+				i++
+				newArgs = append(newArgs, args[:i+1]...)
+			}
+			// add --conf spark.jars.ivy=/mnt/mesos/sandbox/.ivy2
+			newArgs = append(newArgs, "--conf", "spark.jars.ivy=/mnt/mesos/sandbox/.ivy2")
 			newArgs = append(newArgs, args[i+1:]...)
 			break
 		}

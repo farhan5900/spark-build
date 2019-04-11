@@ -13,7 +13,7 @@ import com.google.common.base.Verify
   */ 
 object ProvidedPackages {
     def main(args: Array[String]): Unit = {
-        val AppName = "ProvidedPackages App"
+        val appName = "ProvidedPackages"
         println(s"Running $AppName\n")
 
         var inputNumber = 10
@@ -35,8 +35,8 @@ object ProvidedPackages {
 	// Calculate the sum on the executor
         val executorSum = spark.sparkContext.parallelize(1 to inputNumber).reduce((x, y) => IntMath.checkedAdd(x, y))
         
-        // Verify the both sum
+        // Verify both sums
         Verify.verify(driverSum == executorSum, "Sum of %s numbers on the executor (%s) is not equal to sum on the driver (%s)", inputNumber.toString, executorSum.toString, driverSum.toString)
-	println(s"The sum of $inputNumber numbers is $driverSum")
+	println(s"$driverSum")
     }
 }
