@@ -14,7 +14,7 @@ import com.google.common.base.Verify
 object ProvidedPackages {
     def main(args: Array[String]): Unit = {
         val appName = "ProvidedPackages"
-        println(s"Running $AppName\n")
+        println(s"Running $appName\n")
 
         var inputNumber = 10
         // Check argument is provided
@@ -30,7 +30,7 @@ object ProvidedPackages {
 	var driverSum = 0
 	(1 to inputNumber).foreach(driverSum += _)
 
-        val spark = SparkSession.builder.appName(AppName).getOrCreate()
+        val spark = SparkSession.builder.appName(appName).getOrCreate()
 
 	// Calculate the sum on the executor
         val executorSum = spark.sparkContext.parallelize(1 to inputNumber).reduce((x, y) => IntMath.checkedAdd(x, y))
