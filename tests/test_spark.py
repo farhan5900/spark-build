@@ -176,12 +176,11 @@ def test_jars_flag(service_name=utils.SPARK_SERVICE_NAME):
               "--class MultiConfs"])
 
 @pytest.mark.sanity
-def test_packages_flag(service_name=utils.SPARK_SERVICE_NAME):
+def test_packages_flag():
     utils.run_tests(
         app_url=utils.dcos_test_jar_url(),
         app_args="20",
         expected_output="210",
-        service_name=service_name,
         args=["--packages com.google.guava:guava:23.0",
               "--class ProvidedPackages"])
 
