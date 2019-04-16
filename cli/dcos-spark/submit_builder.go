@@ -22,6 +22,8 @@ var keyWhitespaceValPattern = regexp.MustCompile("(.+)\\s+(.+)")
 var backslashNewlinePattern = regexp.MustCompile("\\s*\\\\s*\\n\\s+")
 var collapseSpacesPattern = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
 
+const mesosSandboxPath = "/mnt/mesos/sandbox"
+
 type sparkVal struct {
 	flagName string
 	propName string
@@ -374,9 +376,9 @@ func processJarsFlag(args []string) []string {
 			}
 			// add --conf spark.driver.extraClassPaths=one.jar:two.jar
 			// add --conf spark.executor.extraClassPath=one.jar:two.jar
-			jarPaths := strings.Join(jarNames, ":/mnt/mesos/sandbox/")
-			newArgs = append(newArgs, "--conf", "spark.driver.extraClassPath=/mnt/mesos/sandbox/"+jarPaths)
-			newArgs = append(newArgs, "--conf", "spark.executor.extraClassPath=/mnt/mesos/sandbox/"+jarPaths)
+			jarPaths := strings.Join(jarNames, ":"+mesosSandboxPath+"/")
+			newArgs = append(newArgs, "--conf", "spark.driver.extraClassPath="+mesosSandboxPath+"/"+jarPaths)
+			newArgs = append(newArgs, "--conf", "spark.executor.extraClassPath="+mesosSandboxPath+"/"+jarPaths)
 			newArgs = append(newArgs, args[i+1:]...)
 			break
 		}
@@ -399,8 +401,8 @@ func processPackagesFlag(args []string) []string {
 				i++
 				newArgs = append(newArgs, args[:i+1]...)
 			}
-			// add --conf spark.jars.ivy=/mnt/mesos/sandbox/.ivy2
-			newArgs = append(newArgs, "--conf", "spark.jars.ivy=/mnt/mesos/sandbox/.ivy2")
+			// add --conf spark.jars.ivy=path/to/ivy_user_dir
+			newArgs = append(newArgs, "--conf", "spark.jars.ivy="+mesosSandboxPath+"/.ivy2")
 			newArgs = append(newArgs, args[i+1:]...)
 			break
 		}
