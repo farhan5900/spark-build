@@ -389,3 +389,67 @@ def test_task_stdout():
         assert stdout_file["size"] > 0, "stdout file should have content"
     finally:
         sdk_install.uninstall(utils.SPARK_PACKAGE_NAME, service_name)
+
+
+@pytest.mark.sanity
+def test_supervise_conflict_frameworkid():
+    job_service_name = "MockTaskRunner"
+
+    @retrying.retry(
+        wait_fixed=1000,
+        stop_max_delay=600 * 1000,
+        retry_on_result=lambda res: not res)
+    def wait_job_present(present):
+        svc = shakedown.get_service(job_service_name)
+        if present:
+            return svc is not None
+        else:
+            return svc is None
+
+    job_args = ["--supervise",
+                "--class", "MockTaskRunner",
+                "--conf", "spark.cores.max=8",
+                "--conf", "spark.executors.cores=4"]
+
+    driver_id = utils.submit_job(app_url=utils.dcos_test_jar_url(),
+                                 app_args="4 1800",
+                                 service_name=utils.SPARK_SERVICE_NAME,
+                                 args=job_args)
+    LOGGER.info("Started supervised driver {}".format(driver_id))
+    wait_job_present(True)
+    LOGGER.info("Job has registered")
+    sdk_tasks.check_running(job_service_name, 1)
+    LOGGER.info("Job has running executors")
+
+    service_info = shakedown.get_service(job_service_name).dict()
+    driver_regex = "spark.mesos.driver.frameworkId={}".format(service_info['id'])
+
+    status, stdout = shakedown.run_command_on_agent(service_info['hostname'],
+                                                    "ps aux | grep -v grep | grep '{}'".format(driver_regex),
+                                                    username=sdk_cmd.LINUX_USER)
+
+    pids = [p.strip().split()[1] for p in stdout.splitlines()]
+
+    for pid in pids:
+        status, stdout = shakedown.run_command_on_agent(service_info['hostname'],
+                                                        "sudo kill -9 {}".format(pid),
+                                                        username=sdk_cmd.LINUX_USER)
+
+        if status:
+            print("Killed pid: {}".format(pid))
+        else:
+            print("Unable to killed pid: {}".format(pid))
+
+    wait_job_present(True)
+    LOGGER.info("Job has re-registered")
+    sdk_tasks.check_running(job_service_name, 1)
+    LOGGER.info("Job has re-started")
+
+    restarted_service_info = shakedown.get_service(job_service_name).dict()
+    assert service_info['id'] != restarted_service_info['id'], "Job has restarted with same framework Id"
+
+    kill_info = utils.kill_driver(driver_id, utils.SPARK_SERVICE_NAME)
+    LOGGER.info("{}".format(kill_info))
+    kill_info = json.loads(kill_info)
+    assert kill_info["success"], "Failed to kill spark job"
+    wait_job_present(False)
