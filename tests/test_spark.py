@@ -25,7 +25,7 @@ import spark_s3 as s3
 import spark_utils as utils
 
 
-LOGGER = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 SPARK_PI_FW_NAME = "Spark Pi"
 CNI_TEST_NUM_EXECUTORS = 1
@@ -72,13 +72,13 @@ def wait_for_jobs_completion(driver_id_1, driver_id_2):
     data_1 = json.loads(out_1)
     data_2 = json.loads(out_2)
 
-    LOGGER.info('Driver 1 state: %s, Driver 2 state: %s'%(data_1['driverState'], data_2['driverState']))
+    log.info('Driver 1 state: %s, Driver 2 state: %s'%(data_1['driverState'], data_2['driverState']))
     return data_1['driverState'] == data_2["driverState"] == "FINISHED"
 
 
 @pytest.mark.sanity
 def test_unique_task_ids():
-    LOGGER.info('Submitting two sample Spark Applications')
+    log.info('Submitting two sample Spark Applications')
     submit_args = ["--conf spark.cores.max=1", "--class org.apache.spark.examples.SparkPi"]
 
     driver_id_1 = utils.submit_job(app_url=utils.SPARK_EXAMPLES,
@@ -89,21 +89,21 @@ def test_unique_task_ids():
                                    app_args="100",
                                    args=submit_args)
 
-    LOGGER.info('Two Spark Applications submitted. Driver 1 ID: %s, Driver 2 ID: %s'%(driver_id_1,driver_id_2))
-    LOGGER.info('Waiting for completion. Polling state')
+    log.info('Two Spark Applications submitted. Driver 1 ID: %s, Driver 2 ID: %s'%(driver_id_1,driver_id_2))
+    log.info('Waiting for completion. Polling state')
     completed = wait_for_jobs_completion(driver_id_1, driver_id_2)
 
     assert completed == True, 'Sample Spark Applications failed to successfully complete within given time'
     out = sdk_cmd.run_cli("task --completed --json")
     data = json.loads(out)
 
-    LOGGER.info('Collecting tasks that belong to the drivers created in this test')
+    log.info('Collecting tasks that belong to the drivers created in this test')
     task_ids = []
     for d in data:
         if driver_id_1 in d['framework_id'] or driver_id_2 in d['framework_id']:
             task_ids.append(d['id'])
 
-    LOGGER.info('Tasks found: %s'%(' '.join(task_ids)))
+    log.info('Tasks found: %s'%(' '.join(task_ids)))
     assert len(task_ids) == len(set(task_ids)), 'Task ids for two independent Spark Applications contain duplicates'
 
 
@@ -408,48 +408,45 @@ def test_supervise_conflict_frameworkid():
 
     job_args = ["--supervise",
                 "--class", "MockTaskRunner",
-                "--conf", "spark.cores.max=8",
-                "--conf", "spark.executors.cores=4"]
+                "--conf", "spark.cores.max=1",
+                "--conf", "spark.executors.cores=1"]
 
-    driver_id = utils.submit_job(app_url=utils.dcos_test_jar_url(),
-                                 app_args="4 1800",
-                                 service_name=utils.SPARK_SERVICE_NAME,
-                                 args=job_args)
-    LOGGER.info("Started supervised driver {}".format(driver_id))
-    wait_job_present(True)
-    LOGGER.info("Job has registered")
-    sdk_tasks.check_running(job_service_name, 1)
-    LOGGER.info("Job has running executors")
+    try:
+        driver_id = utils.submit_job(app_url=utils.dcos_test_jar_url(),
+                app_args="1 1800",
+                service_name=utils.SPARK_SERVICE_NAME,
+                args=job_args)
+        log.info("Started supervised driver {}".format(driver_id))
 
-    service_info = shakedown.get_service(job_service_name).dict()
-    driver_regex = "spark.mesos.driver.frameworkId={}".format(service_info['id'])
+        wait_job_present(True)
+        log.info("Job has registered")
 
-    status, stdout = shakedown.run_command_on_agent(service_info['hostname'],
-                                                    "ps aux | grep -v grep | grep '{}'".format(driver_regex),
-                                                    username=sdk_cmd.LINUX_USER)
+        sdk_tasks.check_running(job_service_name, 1)
+        log.info("Job has running executors")
 
-    pids = [p.strip().split()[1] for p in stdout.splitlines()]
-
-    for pid in pids:
-        status, stdout = shakedown.run_command_on_agent(service_info['hostname'],
-                                                        "sudo kill -9 {}".format(pid),
-                                                        username=sdk_cmd.LINUX_USER)
+        service_info = shakedown.get_service(job_service_name).dict()
+        driver_regex = "spark.mesos.driver.frameworkId={}".format(service_info['id'])
+        status, stdout = shakedown.run_command_on_agent(service_info['hostname'], 
+                "ps axo pid,command | grep -v grep | grep '{}' | cut -d' ' -f1 | sudo xargs kill -9".format(driver_regex),
+                username=sdk_cmd.LINUX_USER)
 
         if status:
-            print("Killed pid: {}".format(pid))
+            log.info("Killed all the PIDs")
         else:
-            print("Unable to killed pid: {}".format(pid))
+            log.info("Unable to kill PIDs")
 
-    wait_job_present(True)
-    LOGGER.info("Job has re-registered")
-    sdk_tasks.check_running(job_service_name, 1)
-    LOGGER.info("Job has re-started")
+        wait_job_present(False)
 
-    restarted_service_info = shakedown.get_service(job_service_name).dict()
-    assert service_info['id'] != restarted_service_info['id'], "Job has restarted with same framework Id"
+        wait_job_present(True)
+        log.info("Job has re-registered")
+        sdk_tasks.check_running(job_service_name, 1)
+        log.info("Job has re-started")
 
-    kill_info = utils.kill_driver(driver_id, utils.SPARK_SERVICE_NAME)
-    LOGGER.info("{}".format(kill_info))
-    kill_info = json.loads(kill_info)
-    assert kill_info["success"], "Failed to kill spark job"
-    wait_job_present(False)
+        restarted_service_info = shakedown.get_service(job_service_name).dict()
+        assert service_info['id'] != restarted_service_info['id'], "Job has restarted with same framework Id"
+    finally:
+        kill_info = utils.kill_driver(driver_id, utils.SPARK_SERVICE_NAME)
+        log.info("{}".format(kill_info))
+        kill_info = json.loads(kill_info)
+        assert kill_info["success"], "Failed to kill spark job"
+        wait_job_present(False)
