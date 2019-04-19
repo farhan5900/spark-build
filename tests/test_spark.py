@@ -426,14 +426,7 @@ def test_supervise_conflict_frameworkid():
 
         service_info = shakedown.get_service(job_service_name).dict()
         driver_regex = "spark.mesos.driver.frameworkId={}".format(service_info['id'])
-        status, stdout = shakedown.run_command_on_agent(service_info['hostname'], 
-                "ps axo pid,command | grep -v grep | grep '{}' | cut -d' ' -f1 | sudo xargs kill -9".format(driver_regex),
-                username=sdk_cmd.LINUX_USER)
-
-        if status:
-            log.info("Killed all the PIDs")
-        else:
-            log.info("Unable to kill PIDs")
+        kill_status = sdk_cmd.kill_task_with_pattern(driver_regex, service_info['hostname'])
 
         wait_job_present(False)
 
@@ -447,6 +440,5 @@ def test_supervise_conflict_frameworkid():
     finally:
         kill_info = utils.kill_driver(driver_id, utils.SPARK_SERVICE_NAME)
         log.info("{}".format(kill_info))
-        kill_info = json.loads(kill_info)
-        assert kill_info["success"], "Failed to kill spark job"
+        assert json.loads(kill_info)["success"], "Failed to kill spark job"
         wait_job_present(False)
