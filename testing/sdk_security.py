@@ -200,6 +200,16 @@ def delete_secret(secret: str) -> None:
     sdk_cmd.run_cli("security secrets delete {}".format(secret))
 
 
+def create_secret(secret: str, secret_value_or_filename: str, is_file: bool) -> None:
+    """
+    Creates secret of type file or value by given name
+    """
+    if is_file:
+        sdk_cmd.run_cli("security secrets create -f {} {}".format(secret_value_or_filename, secret))
+    else:
+        sdk_cmd.run_cli("security secrets create -v {} {}".format(secret_value_or_filename, secret))
+
+
 def _get_role_list(service_name: str) -> typing.List[str]:
     # TODO: spark_utils uses:
     # app_id_encoded = urllib.parse.quote(
