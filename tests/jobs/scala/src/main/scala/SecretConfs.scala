@@ -19,7 +19,7 @@ import net.liftweb.json._
         --conf=spark.mesos.driver.secret.names='/path/to/secret' \
         --conf=spark.mesos.driver.secret.envkeys='SECRET_ENV_KEY' \
         --class SecretConfs \
-        <jar>"
+        <jar> isStrictCluster"
   */ 
 object SecretConfs {
     implicit val formats = DefaultFormats
@@ -28,7 +28,13 @@ object SecretConfs {
 
     def main(args: Array[String]): Unit = {
         val appName = "SecretConfs"
-        val baseUrl = "http://master.mesos"
+	var baseUrl = "http://master.mesos"
+
+	if(args.length > 0) {
+		if(args(0).toUpperCase().startsWith("T")) {
+			baseUrl = "https://master.mesos"
+		}
+	}
         val authEndPoint = "/acs/api/v1/auth/login"
         val secretEndPoint = "/secrets/v1/secret/default"
 
