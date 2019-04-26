@@ -75,6 +75,7 @@ object SecretConfs {
         val httpResponse = httpClient.execute(httpGet)
         val entity = httpResponse.getEntity()
         val resContent = IOUtils.toString(entity.getContent, StandardCharsets.UTF_8)
+	println("Fetched Secret Content: " + resContent)
 
         httpClient.getConnectionManager.shutdown
 
