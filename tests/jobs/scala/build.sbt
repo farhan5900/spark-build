@@ -18,7 +18,7 @@ lazy val root = (project in file("."))
       "com.airbnb" % "kafka-statsd-metrics2" % "0.5.2+issue28" from "https://infinity-artifacts.s3.amazonaws.com/scale-tests/kafka-statsd-metrics2-0.5.2+issue28-20180612-8c1e3c4f3fa83.jar",
       "com.datadoghq" % "java-dogstatsd-client" % "2.5",
       "com.google.guava" % "guava" % "23.0" % "provided",
-      "net.liftweb" %% "lift-webkit" % "3.3.0" % "compile"
+      "org.apache.httpcomponents" % "httpclient" % "4.5"
     )
   )
 

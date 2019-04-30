@@ -96,13 +96,13 @@ https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<
 In the example above Spark will download the `guava` package in the classpath of driver as well as executors. The classpath will be decided by the `spark.jars.ivy` setting.
 
 ## SecretConfs
-[SecretConfs](src/main/scala/SecretConfs.scala) reads the configurations related to Mesos Secret and prints the secret value. If it is a reference based secret, read the secret name using `spark.mesos.driver.secret.names` and fetch the corresponding secret value from DC/OS Secret Store. If it is a value based secret, read the value using `spark.mesos.driver.secret.values` and prints it. It handles file based as well as environment based secrets. It accepts one argument `isStrictCluster`, default value is `False`, to determine whether the cluster is permissive or strict.
+[SecretConfs](src/main/scala/SecretConfs.scala) reads the configurations related to Mesos Secret and prints the secret value. If it is a reference based secret, read the secret name using `spark.mesos.driver.secret.names` and fetch the corresponding secret value from DC/OS Secret Store. If it is a value based secret, read the value using `spark.mesos.driver.secret.values` and prints it. It handles file based as well as environment based secrets. It accepts one argument `authToken`.
 
 Usage:
 
 ```
 dcos spark run --submit-args="--class SecretConfs \
-https://s3.us-east-2.amazonaws.com/<S3 Bucket>/dcos-spark-scala-tests-assembly-<version>.jar isStrictCluster"
+https://s3.us-east-2.amazonaws.com/<S3 Bucket>/dcos-spark-scala-tests-assembly-<version>.jar authToken"
 ```
 
 Examples:
@@ -112,7 +112,7 @@ dcos spark run --verbose --submit-args=" \
 --conf spark.mesos.driver.secret.names='/path/to/secret' \
 --conf spark.mesos.driver.secret.envkeys='SECRET_ENV_KEY' \
 --class SecretConfs \
-https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar True"
+https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar xyz123"
 ```
 
 OR
@@ -122,7 +122,7 @@ dcos spark run --verbose --submit-args=" \
 --conf spark.mesos.driver.secret.values='secret-value' \
 --conf spark.mesos.driver.secret.envkeys='SECRET_ENV_KEY' \
 --class SecretConfs \
-https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar False"
+https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar xyz123"
 ```
 
 OR
@@ -132,7 +132,7 @@ dcos spark run --verbose --submit-args=" \
 --conf spark.mesos.driver.secret.names='/path/to/secret' \
 --conf spark.mesos.driver.secret.filenames='/topsecret' \
 --class SecretConfs \
-https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar"
+https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar xyz123"
 ```
 
 OR
@@ -142,6 +142,6 @@ dcos spark run --verbose --submit-args=" \
 --conf spark.mesos.driver.secret.values='username' \
 --conf spark.mesos.driver.secret.filenames='/whoami' \
 --class SecretConfs \
-https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar"
+https://s3.us-east-2.amazonaws.com/<S3 bucket>/dcos-spark-scala-tests-assembly-<version>.jar xyz123"
 ```
 

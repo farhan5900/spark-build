@@ -1,15 +1,23 @@
-import org.apache.spark.SparkConf
-
-import org.apache.http.entity.StringEntity
-import org.apache.http.HttpHeaders
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.client.methods.HttpPost
-import org.apache.http.impl.client.DefaultHttpClient
+import java.nio.charset.StandardCharsets
+import java.security.cert.X509Certificate
+import java.security.cert.CertificateException
 
 import org.apache.commons.io.IOUtils
-import java.nio.charset.StandardCharsets
 
-import net.liftweb.json._
+import org.apache.http.client.methods.HttpGet
+import org.apache.http.conn.ssl.NoopHostnameVerifier
+import org.apache.http.HttpHeaders
+import org.apache.http.impl.client.HttpClients
+import org.apache.http.impl.client.CloseableHttpClient
+
+import org.apache.http.ssl.SSLContextBuilder
+import org.apache.http.conn.ssl.TrustStrategy
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory
+
+import org.apache.spark.SparkConf
+
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
 
 /**
   * Application that outputs Spark Mesos Secret Configuration.
@@ -19,24 +27,21 @@ import net.liftweb.json._
         --conf=spark.mesos.driver.secret.names='/path/to/secret' \
         --conf=spark.mesos.driver.secret.envkeys='SECRET_ENV_KEY' \
         --class SecretConfs \
-        <jar> isStrictCluster"
+        <jar> authToken"
   */ 
 object SecretConfs {
     implicit val formats = DefaultFormats
-    case class AuthResponse(token: String)
     case class SecretResponse(value: String)
+
+    class TrustAllStrategy extends TrustStrategy {
+        @throws(classOf[CertificateException])
+        override def isTrusted(chain: Array[X509Certificate], authType:String): Boolean = { true }
+    }
 
     def main(args: Array[String]): Unit = {
         val appName = "SecretConfs"
-	var baseUrl = "http://master.mesos"
-
-	if(args.length > 0) {
-		if(args(0).toUpperCase().startsWith("T")) {
-			baseUrl = "https://master.mesos"
-		}
-	}
-        val authEndPoint = "/acs/api/v1/auth/login"
-        val secretEndPoint = "/secrets/v1/secret/default"
+	var baseUrl = "https://master.mesos/secrets/v1/secret/default"
+        val authToken = args(0)
 
         println(s"Running $appName\n")
 	
@@ -45,37 +50,16 @@ object SecretConfs {
         var secretValue = conf.get("spark.mesos.driver.secret.values", "")
 	var secretFile = conf.get("spark.mesos.driver.secret.filenames", "")
 
-        val authToken = postRestContent(baseUrl, authEndPoint)
-
         if(!secretPath.isEmpty()) {
-            secretValue = getRestContent(baseUrl, secretEndPoint, authToken, secretPath, !secretFile.isEmpty())
+            secretValue = getSecretContent(baseUrl, secretPath, authToken, !secretFile.isEmpty())
         }
 
         println(secretValue)
     }
 
-    def postRestContent(url:String, endPoint:String): String = {
-        val httpClient = new DefaultHttpClient
-        val httpPost = new HttpPost(url+endPoint)
-        val reqContent = """{ "uid": "bootstrapuser", "exp": 0, "password": "deleteme" }"""
-
-        httpPost.addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        httpPost.setEntity(new StringEntity(reqContent))
-        
-        val httpResponse = httpClient.execute(httpPost)
-        val entity = httpResponse.getEntity
-        val resContent = IOUtils.toString(entity.getContent, StandardCharsets.UTF_8)
-	println("Fetched Auth Content: " + resContent)
-        
-        httpClient.getConnectionManager.shutdown
-
-        val resJson = parse(resContent).extract[AuthResponse]
-        resJson.token
-    }
-
-    def getRestContent(url:String, endPoint:String, authToken:String, secretPath:String, isSecretFile:Boolean): String = {
-        val httpClient = new DefaultHttpClient
-        val httpGet = new HttpGet(url+endPoint+secretPath)
+    def getSecretContent(url:String, endPoint:String, authToken:String, isSecretFile:Boolean): String = {
+        var httpClient = createAcceptAllClient()
+        val httpGet = new HttpGet(url+endPoint)
 
         httpGet.addHeader(HttpHeaders.AUTHORIZATION, "token="+authToken)
 
@@ -84,7 +68,7 @@ object SecretConfs {
         val resContent = IOUtils.toString(entity.getContent, StandardCharsets.UTF_8)
 	println("Fetched Secret Content: " + resContent)
 
-        httpClient.getConnectionManager.shutdown
+        httpClient.close()
 
 	if(isSecretFile) {
 		resContent
@@ -92,5 +76,15 @@ object SecretConfs {
 	        val resJson = parse(resContent).extract[SecretResponse]
         	resJson.value
 	}
+    }
+
+    def createAcceptAllClient(): CloseableHttpClient = {
+        val sslContext = SSLContextBuilder.create().loadTrustMaterial(new TrustAllStrategy()).build()
+        val allowAllHosts = new NoopHostnameVerifier()
+        val connectionFactory = new SSLConnectionSocketFactory(sslContext, allowAllHosts)
+        return HttpClients
+                .custom()
+                .setSSLSocketFactory(connectionFactory)
+                .build()
     }
 }
