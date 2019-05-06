@@ -33,8 +33,8 @@ def test_env_based_ref_secret():
             app_url=utils.dcos_test_jar_url(),
             app_args=auth_token,
             expected_output=secret_value,
-            args=["--conf=spark.mesos.driver.secret.names='"+secret_path+"'",
-                  "--conf=spark.mesos.driver.secret.envkeys='SECRET_ENV_KEY'",
+            args=["--conf=spark.mesos.driver.secret.names={}".format(secret_path),
+                  "--conf=spark.mesos.driver.secret.envkeys=SECRET_ENV_KEY",
                   "--class SecretConfs"])
     finally:
         dcos_utils.delete_secret(secret_path)
@@ -48,8 +48,8 @@ def test_value_secret():
         app_url=utils.dcos_test_jar_url(),
         app_args=auth_token,
         expected_output=secret_value,
-        args=["--conf=spark.mesos.driver.secret.values='"+secret_value+"'",
-              "--conf=spark.mesos.driver.secret.envkeys='SECRET_ENV_KEY'",
+        args=["--conf=spark.mesos.driver.secret.values={}".format(secret_value),
+              "--conf=spark.mesos.driver.secret.envkeys=SECRET_ENV_KEY",
               "--class SecretConfs"])
 
 
@@ -68,8 +68,8 @@ def test_file_based_ref_secret():
             app_url=utils.dcos_test_jar_url(),
             app_args=auth_token,
             expected_output=secret_value,
-            args=["--conf=spark.mesos.driver.secret.names='"+secret_path+"'",
-                  "--conf=spark.mesos.driver.secret.filenames='"+secret_file_name+"'",
+            args=["--conf=spark.mesos.driver.secret.names={}".format(secret_path),
+                  "--conf=spark.mesos.driver.secret.filenames={}".format(secret_file_name),
                   "--class SecretConfs"])
     finally:
         dcos_utils.delete_secret(secret_path)
