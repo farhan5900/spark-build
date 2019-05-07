@@ -15,8 +15,6 @@ import retrying
 import shakedown
 
 import sdk_cmd
-import sdk_hosts
-import sdk_install
 import sdk_security
 import sdk_tasks
 import sdk_utils
@@ -70,6 +68,29 @@ def test_mesos_label_support():
     driver_task_info = sdk_cmd._get_task_info(driver_task_id)
     expected = {'key': 'foo', 'value': 'bar'}
     assert expected in driver_task_info['labels']
+
+
+@pytest.mark.sanity
+def test_dispatcher_liveliness_after_malformed_request():
+    # Get dispatcher ip and port
+    dispatcher_details = sdk_cmd._get_task_info(utils.SPARK_PACKAGE_NAME)
+    ip = dispatcher_details['statuses'][0]['container_status']['network_infos'][0]['ip_addresses'][0]['ip_address']
+    port = dispatcher_details['discovery']['ports']['ports'][0]['number']
+
+    # Sends resource/<filename> as a submission request to dispatcher and returns action field
+    def submit_dispatcher_request(request_filename):
+        with open(os.path.join(THIS_DIR, 'resources', request_filename), 'r') as file:
+            request = file.read()
+        curl_command = '''curl -d '{}' -H "Content-Type: application/json" -X POST "http://{}:{}/v1/submissions/create"''' \
+            .format(request, ip, port)
+        success, output = sdk_cmd.master_ssh(curl_command)
+        assert success
+        return json.loads(output)['action']
+
+    # Perform valid, invalid and valid again requests
+    assert submit_dispatcher_request('dispatcher_submit_request_valid.json') == 'CreateSubmissionResponse'
+    assert submit_dispatcher_request('dispatcher_submit_request_missing_args.json') == 'ErrorResponse'
+    assert submit_dispatcher_request('dispatcher_submit_request_valid.json') == 'CreateSubmissionResponse'
 
 
 def retry_if_false(result):
@@ -294,19 +315,6 @@ def test_s3_env():
     assert len(list(s3.list("linecount-env.txt"))) > 0
 
 
-@pytest.mark.dcos_min_version('1.10')
-@pytest.mark.sanity
-@pytest.mark.smoke
-def test_foldered_spark():
-    service_name = utils.FOLDERED_SPARK_SERVICE_NAME
-    zk = 'spark_mesos_dispatcher__path_to_spark'
-    utils.require_spark(service_name=service_name, zk=zk)
-    test_sparkPi(service_name=service_name)
-    utils.teardown_spark(service_name=service_name, zk=zk)
-    # reinstall CLI so that it's available for the following tests:
-    sdk_cmd.run_cli('package install --cli {} --yes'.format(utils.SPARK_PACKAGE_NAME))
-
-
 @pytest.mark.sanity
 def test_cli_multiple_spaces():
     utils.run_tests(app_url=utils.SPARK_EXAMPLES,
@@ -361,106 +369,3 @@ def test_driver_executor_tls():
         sdk_cmd.run_cli('security secrets delete /{}'.format(keystore_secret))
         sdk_cmd.run_cli('security secrets delete /{}'.format(truststore_secret))
         sdk_cmd.run_cli('security secrets delete /{}'.format(my_secret))
-
-
-@pytest.mark.sanity
-def test_unique_vips():
-
-    @retrying.retry(wait_exponential_multiplier=1000, stop_max_attempt_number=7) # ~2 minutes
-    def verify_ip_is_reachable(ip):
-        ok, _ = sdk_cmd.master_ssh("curl -v {}".format(ip))
-        assert ok
-
-    spark1_service_name = "test/groupa/spark"
-    spark2_service_name = "test/groupb/spark"
-    try:
-        utils.require_spark(spark1_service_name)
-        utils.require_spark(spark2_service_name)
-
-        dispatcher1_ui_ip = sdk_hosts.vip_host("marathon", "dispatcher.{}".format(spark1_service_name), 4040)
-        dispatcher2_ui_ip = sdk_hosts.vip_host("marathon", "dispatcher.{}".format(spark2_service_name), 4040)
-
-        verify_ip_is_reachable(dispatcher1_ui_ip)
-        verify_ip_is_reachable(dispatcher2_ui_ip)
-    finally:
-        sdk_install.uninstall(utils.SPARK_PACKAGE_NAME, spark1_service_name)
-        sdk_install.uninstall(utils.SPARK_PACKAGE_NAME, spark2_service_name)
-
-
-@pytest.mark.sanity
-def test_task_stdout():
-    service_name = utils.FOLDERED_SPARK_SERVICE_NAME
-
-    try:
-        task_id = service_name.lstrip("/").replace("/", "_")
-        utils.require_spark(service_name=service_name)
-
-        task = sdk_cmd._get_task_info(task_id)
-        if not task:
-            raise Exception("Failed to get '{}' task".format(task_id))
-
-        task_sandbox_path = sdk_cmd.get_task_sandbox_path(task_id)
-        if not task_sandbox_path:
-            raise Exception("Failed to get '{}' sandbox path".format(task_id))
-        agent_id = task["slave_id"]
-
-        task_sandbox = sdk_cmd.cluster_request(
-            "GET", "/slave/{}/files/browse?path={}".format(agent_id, task_sandbox_path)
-        ).json()
-        stdout_file = [f for f in task_sandbox if f["path"].endswith("/stdout")][0]
-        assert stdout_file["size"] > 0, "stdout file should have content"
-    finally:
-        sdk_install.uninstall(utils.SPARK_PACKAGE_NAME, service_name)
-
-
-@pytest.mark.sanity
-def test_supervise_conflict_frameworkid():
-    job_service_name = "MockTaskRunner"
-
-    @retrying.retry(
-        wait_fixed=1000,
-        stop_max_delay=600 * 1000,
-        retry_on_result=lambda res: not res)
-    def wait_job_present(present):
-        svc = shakedown.get_service(job_service_name)
-        if present:
-            return svc is not None
-        else:
-            return svc is None
-
-    job_args = ["--supervise",
-                "--class", "MockTaskRunner",
-                "--conf", "spark.cores.max=1",
-                "--conf", "spark.executors.cores=1"]
-
-    try:
-        driver_id = utils.submit_job(app_url=utils.dcos_test_jar_url(),
-                app_args="1 1800",
-                service_name=utils.SPARK_SERVICE_NAME,
-                args=job_args)
-        log.info("Started supervised driver {}".format(driver_id))
-
-        wait_job_present(True)
-        log.info("Job has registered")
-
-        sdk_tasks.check_running(job_service_name, 1)
-        log.info("Job has running executors")
-
-        service_info = shakedown.get_service(job_service_name).dict()
-        driver_regex = "spark.mesos.driver.frameworkId={}".format(service_info['id'])
-        kill_status = sdk_cmd.kill_task_with_pattern(driver_regex, service_info['hostname'])
-
-        wait_job_present(False)
-
-        wait_job_present(True)
-        log.info("Job has re-registered")
-        sdk_tasks.check_running(job_service_name, 1)
-        log.info("Job has re-started")
-
-        restarted_service_info = shakedown.get_service(job_service_name).dict()
-        assert service_info['id'] != restarted_service_info['id'], "Job has restarted with same framework Id"
-    finally:
-        kill_info = utils.kill_driver(driver_id, utils.SPARK_SERVICE_NAME)
-        log.info("{}".format(kill_info))
-        assert json.loads(kill_info)["success"], "Failed to kill spark job"
-        wait_job_present(False)
