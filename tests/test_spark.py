@@ -369,3 +369,56 @@ def test_driver_executor_tls():
         sdk_cmd.run_cli('security secrets delete /{}'.format(keystore_secret))
         sdk_cmd.run_cli('security secrets delete /{}'.format(truststore_secret))
         sdk_cmd.run_cli('security secrets delete /{}'.format(my_secret))
+
+
+@pytest.mark.sanity
+def test_supervise_conflict_frameworkid():
+    job_service_name = "MockTaskRunner"
+
+    @retrying.retry(
+        wait_fixed=1000,
+        stop_max_delay=600 * 1000,
+        retry_on_result=lambda res: not res)
+    def wait_job_present(present):
+        svc = shakedown.get_service(job_service_name)
+        if present:
+            return svc is not None
+        else:
+            return svc is None
+
+    job_args = ["--supervise",
+                "--class", "MockTaskRunner",
+                "--conf", "spark.cores.max=1",
+                "--conf", "spark.executors.cores=1"]
+
+    try:
+        driver_id = utils.submit_job(app_url=utils.dcos_test_jar_url(),
+                app_args="1 1800",
+                service_name=utils.SPARK_SERVICE_NAME,
+                args=job_args)
+        log.info("Started supervised driver {}".format(driver_id))
+
+        wait_job_present(True)
+        log.info("Job has registered")
+
+        sdk_tasks.check_running(job_service_name, 1)
+        log.info("Job has running executors")
+
+        service_info = shakedown.get_service(job_service_name).dict()
+        driver_regex = "spark.mesos.driver.frameworkId={}".format(service_info['id'])
+        kill_status = sdk_cmd.kill_task_with_pattern(driver_regex, service_info['hostname'])
+
+        wait_job_present(False)
+
+        wait_job_present(True)
+        log.info("Job has re-registered")
+        sdk_tasks.check_running(job_service_name, 1)
+        log.info("Job has re-started")
+
+        restarted_service_info = shakedown.get_service(job_service_name).dict()
+        assert service_info['id'] != restarted_service_info['id'], "Job has restarted with same framework Id"
+    finally:
+        kill_info = utils.kill_driver(driver_id, utils.SPARK_SERVICE_NAME)
+        log.info("{}".format(kill_info))
+        assert json.loads(kill_info)["success"], "Failed to kill spark job"
+        wait_job_present(False)
