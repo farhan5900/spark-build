@@ -1,6 +1,8 @@
 package org.apache.spark.metrics.sink.statsd;
 
 import com.codahale.metrics.MetricRegistry;
+import com.google.common.collect.ImmutableSet;
+
 import org.apache.spark.metrics.sink.Sink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,19 +32,33 @@ public class StatsdSink implements Sink {
 
         TimeUnit rateUnit = TimeUnit.valueOf(properties.getProperty(Keys.RATE_UNIT, Defaults.RATE_UNIT).toUpperCase());
         TimeUnit durationUnit = TimeUnit.valueOf(properties.getProperty(Keys.DURATION_UNIT, Defaults.DURATION_UNIT).toUpperCase());
+        
+        String excludes = properties.getProperty(Keys.EXCLUDES, Defaults.EXCLUDES);
+        String includes = properties.getProperty(Keys.INCLUDES, Defaults.INCLUDES);
+        boolean useRegexFilters = Boolean.parseBoolean(properties.getProperty(Keys.USE_REGEX_FILTERS, Defaults.USE_REGEX_FILTERS));
 
-        //TODO: add filtering support
+        StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
 
         String[] tags = properties.getProperty(Keys.TAGS, Defaults.TAGS).split(",");
-
-        this.reporter = StatsdReporter
-                .forRegistry(registry)
-                .formatter(new MetricFormatter(new InstanceDetailsProvider(), prefix, tags))
-                .host(host)
-                .port(port)
-                .convertRatesTo(rateUnit)
-                .convertDurationsTo(durationUnit)
-                .build();
+        
+        reporterFactory.setHost(host);
+        reporterFactory.setPort(port);
+        reporterFactory.setPrefix(prefix);
+        reporterFactory.setRateUnit(rateUnit);
+        reporterFactory.setDurationUnit(durationUnit);
+        reporterFactory.setFormatter(new MetricFormatter(new InstanceDetailsProvider(), prefix, tags));
+        
+        if(!excludes.isEmpty()) {
+        	reporterFactory.setExcludes(parseMetricsString(excludes));
+        }
+        
+        if(!includes.isEmpty()) {
+		    reporterFactory.setIncludes(parseMetricsString(includes));
+		}
+        
+        reporterFactory.setUseRegexFilters(useRegexFilters);
+        
+        this.reporter = reporterFactory.build(registry);
     }
 
     @Override
@@ -63,5 +79,9 @@ public class StatsdSink implements Sink {
     @Override
     public void report(){
         reporter.report();
+    }
+    
+    private ImmutableSet<String> parseMetricsString(String metricsString) {
+    	return ImmutableSet.copyOf(metricsString.split(","));
     }
 }

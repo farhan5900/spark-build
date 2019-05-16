@@ -11,7 +11,7 @@
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <dropwizard.metrics.version>3.1.5</dropwizard.metrics.version>
+    <dropwizard.metrics.version>1.0.9</dropwizard.metrics.version>
     <spark.version>2.4.0</spark.version>
     <spark.scala.version>2.11</spark.scala.version>
   </properties>
@@ -26,6 +26,11 @@
       <artifactId>spark-core_${spark.scala.version}</artifactId>
       <version>${spark.version}</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.dropwizard</groupId>
+      <artifactId>dropwizard-metrics</artifactId>
+      <version>${dropwizard.metrics.version}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>

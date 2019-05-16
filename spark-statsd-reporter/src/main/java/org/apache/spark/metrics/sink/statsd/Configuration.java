@@ -10,6 +10,9 @@ final class Configuration {
         final static String POLL_UNIT = "poll.unit";
         final static String RATE_UNIT = "rate.unit";
         final static String DURATION_UNIT = "duration.unit";
+        final static String EXCLUDES = "excludes";
+        final static String INCLUDES = "includes";
+        final static String USE_REGEX_FILTERS = "useRegexFilters";
     }
 
     final static class Defaults {
@@ -21,5 +24,8 @@ final class Configuration {
         final static String RATE_UNIT = "SECONDS";
         final static String DURATION_UNIT = "MILLISECONDS";
         final static String PREFIX = "";
+        final static String EXCLUDES = "";
+        final static String INCLUDES = "";
+        final static String USE_REGEX_FILTERS = "false";
     }
 }
