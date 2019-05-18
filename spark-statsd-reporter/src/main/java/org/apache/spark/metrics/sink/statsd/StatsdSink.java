@@ -1,5 +1,6 @@
 package org.apache.spark.metrics.sink.statsd;
 
+import com.codahale.metrics.MetricAttribute;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.ImmutableSet;
 
@@ -7,6 +8,9 @@ import org.apache.spark.metrics.sink.Sink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -35,7 +39,12 @@ public class StatsdSink implements Sink {
         
         String excludes = properties.getProperty(Keys.EXCLUDES, Defaults.EXCLUDES);
         String includes = properties.getProperty(Keys.INCLUDES, Defaults.INCLUDES);
+        
+        String excludesAttributes = properties.getProperty(Keys.EXCLUDES_ATTRIBUTES, Defaults.EXCLUDES_ATTRIBUTES).toUpperCase();
+        String includesAttributes = properties.getProperty(Keys.INCLUDES_ATTRIBUTES, Defaults.INCLUDES_ATTRIBUTES).toUpperCase();
+        
         boolean useRegexFilters = Boolean.parseBoolean(properties.getProperty(Keys.USE_REGEX_FILTERS, Defaults.USE_REGEX_FILTERS));
+        boolean useSubstringMatching = Boolean.parseBoolean(properties.getProperty(Keys.USE_SUBSTRING_MATCHING, Defaults.USE_SUBSTRING_MATCHING));
 
         StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
 
@@ -56,7 +65,16 @@ public class StatsdSink implements Sink {
 		    reporterFactory.setIncludes(parseMetricsString(includes));
 		}
         
+        if(!excludesAttributes.isEmpty()) {
+		    reporterFactory.setExcludesAttributes(parseAttributesString(excludesAttributes));
+		}
+        
+        if(!includesAttributes.isEmpty()) {
+		    reporterFactory.setIncludesAttributes(parseAttributesString(includesAttributes));
+		}
+        
         reporterFactory.setUseRegexFilters(useRegexFilters);
+        reporterFactory.setUseSubstringMatching(useSubstringMatching);
         
         this.reporter = reporterFactory.build(registry);
     }
@@ -81,7 +99,15 @@ public class StatsdSink implements Sink {
         reporter.report();
     }
     
-    private ImmutableSet<String> parseMetricsString(String metricsString) {
-    	return ImmutableSet.copyOf(metricsString.split(","));
+    private ImmutableSet<String> parseMetricsString(String metrics) {
+    	return ImmutableSet.copyOf(metrics.split(","));
+    }
+    
+    private EnumSet<MetricAttribute> parseAttributesString(String metricsAttributes) {
+    	List<MetricAttribute> listOfAttributes = new ArrayList<>();
+    	for(String attribute: metricsAttributes.split(",")) {
+    		listOfAttributes.add(MetricAttribute.valueOf(attribute));
+    	}
+    	return EnumSet.copyOf(listOfAttributes);
     }
 }
