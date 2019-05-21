@@ -12,8 +12,8 @@ final class Configuration {
         final static String DURATION_UNIT = "duration.unit";
         final static String EXCLUDES = "excludes";
         final static String INCLUDES = "includes";
-		final static String EXCLUDES_ATTRIBUTES = "excludes.attributes";
-		final static String INCLUDES_ATTRIBUTES = "includes.attributes";
+        final static String EXCLUDES_ATTRIBUTES = "excludes.attributes";
+        final static String INCLUDES_ATTRIBUTES = "includes.attributes";
         final static String USE_REGEX_FILTERS = "use.regex.filters";
         final static String USE_SUBSTRING_MATCHING = "use.substring.matching";
     }
