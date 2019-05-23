@@ -8,6 +8,7 @@ public class StatsdReporterFactory extends BaseReporterFactory {
     private String host = "127.0.0.1";
     private int port = 8125;
     private String prefix = "";
+    private String reporterName = "spark-statsd-reporter";
     private MetricFormatter metricFormatter;
 
     public String getHost() {
@@ -34,6 +35,14 @@ public class StatsdReporterFactory extends BaseReporterFactory {
         this.prefix = prefix;
     }
     
+    public String getReporterName() {
+    	return reporterName;
+    }
+    
+    public void setReporterName(String reporterName) {
+    	this.reporterName = reporterName;
+    }
+    
     public MetricFormatter getFormatter() {
     	return metricFormatter;
     }
@@ -44,13 +53,6 @@ public class StatsdReporterFactory extends BaseReporterFactory {
 
     @Override
     public StatsdReporter build(MetricRegistry registry) {
-        return StatsdReporter.forRegistry(registry)
-                .formatter(metricFormatter)
-                .host(host)
-                .port(port)
-                .convertDurationsTo(getDurationUnit())
-                .convertRatesTo(getRateUnit())
-                .filter(getFilter())
-                .build();
+    	return new StatsdReporter(registry, metricFormatter, reporterName, getRateUnit(), getDurationUnit(), getFilter(), host, port);
     }
 }

@@ -21,64 +21,10 @@ public class StatsdReporter extends ScheduledReporter {
     private final InetSocketAddress address;
     private final MetricFormatter metricFormatter;
 
-    private StatsdReporter(MetricRegistry registry, MetricFormatter metricFormatter, String reporterName, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, String host, int port) {
+    protected StatsdReporter(MetricRegistry registry, MetricFormatter metricFormatter, String reporterName, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, String host, int port) {
         super(registry, reporterName, filter, rateUnit, durationUnit);
         this.address = new InetSocketAddress(host, port);
         this.metricFormatter = metricFormatter;
-    }
-
-    static Builder forRegistry(MetricRegistry registry) {
-        return new Builder(registry);
-    }
-
-    public static class Builder {
-        private final MetricRegistry registry;
-        private MetricFormatter metricFormatter;
-        private String reporterName = "spark-statsd-reporter";
-        private TimeUnit rateUnit = TimeUnit.SECONDS;
-        private TimeUnit durationUnit = TimeUnit.MILLISECONDS;
-        private MetricFilter filter = MetricFilter.ALL;
-        private String host = "127.0.0.1";
-        private int port = 8125;
-
-
-        private Builder(MetricRegistry registry) {
-            this.registry = registry;
-        }
-
-        Builder formatter(MetricFormatter metricFormatter) {
-            this.metricFormatter = metricFormatter;
-            return this;
-        }
-
-        Builder convertRatesTo(TimeUnit rateUnit) {
-            this.rateUnit = rateUnit;
-            return this;
-        }
-
-        Builder convertDurationsTo(TimeUnit durationUnit) {
-            this.durationUnit = durationUnit;
-            return this;
-        }
-
-        public Builder filter(MetricFilter filter) {
-            this.filter = filter;
-            return this;
-        }
-
-        Builder host(String host) {
-            this.host = host;
-            return this;
-        }
-
-        Builder port(int port) {
-            this.port = port;
-            return this;
-        }
-
-        StatsdReporter build() {
-            return new StatsdReporter(registry, metricFormatter, reporterName, rateUnit, durationUnit, filter, host, port);
-        }
     }
 
     @Override

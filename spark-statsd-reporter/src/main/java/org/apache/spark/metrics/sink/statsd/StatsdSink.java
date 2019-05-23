@@ -46,9 +46,9 @@ public class StatsdSink implements Sink {
         boolean useRegexFilters = Boolean.parseBoolean(properties.getProperty(Keys.USE_REGEX_FILTERS, Defaults.USE_REGEX_FILTERS));
         boolean useSubstringMatching = Boolean.parseBoolean(properties.getProperty(Keys.USE_SUBSTRING_MATCHING, Defaults.USE_SUBSTRING_MATCHING));
 
-        StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-
         String[] tags = properties.getProperty(Keys.TAGS, Defaults.TAGS).split(",");
+        
+        StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
         
         reporterFactory.setHost(host);
         reporterFactory.setPort(port);
