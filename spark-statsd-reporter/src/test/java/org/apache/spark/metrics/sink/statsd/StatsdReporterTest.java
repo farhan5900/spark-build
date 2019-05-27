@@ -2,6 +2,8 @@ package org.apache.spark.metrics.sink.statsd;
 
 
 import com.codahale.metrics.*;
+import com.google.common.collect.ImmutableSet;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -15,6 +17,7 @@ import java.util.TreeMap;
 import static java.lang.Thread.sleep;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
+import static junit.framework.TestCase.assertFalse;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -55,6 +58,7 @@ public class StatsdReporterTest {
 
         }
     }
+    
     @Test
     public void testCounters() throws Exception {
         final int testUdpPort = 4441;
@@ -174,14 +178,71 @@ public class StatsdReporterTest {
             assertEquals(14, server.receivedMessages().size());
         }
     }
+    
+    @Test
+    public void testExcludeFilter() throws Exception {
+        final int testUdpPort = 4445;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+        	ImmutableSet<String> excludes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeInt".split(","));
+        	StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+        	reporterFactory.setFormatter(formatter);
+        	reporterFactory.setHost("localhost");
+        	reporterFactory.setPort(testUdpPort);
+        	reporterFactory.setExcludes(excludes);
+        	StatsdReporter reporter = reporterFactory.build(null);
+
+            SortedMap<String, Gauge> gauges = new TreeMap<>();
+            gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
+            gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
+
+            reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
+
+            sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
+
+            // Check that both gauge metrics were received and app id is dropped
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
+            assertFalse(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
+            assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
+            assertEquals(1, server.receivedMessages().size());
+
+        }
+    }
+    
+    @Test
+    public void testInludeFilter() throws Exception {
+        final int testUdpPort = 4446;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+        	ImmutableSet<String> includes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeFloat".split(","));
+        	StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+        	reporterFactory.setFormatter(formatter);
+        	reporterFactory.setHost("localhost");
+        	reporterFactory.setPort(testUdpPort);
+        	reporterFactory.setIncludes(includes);
+        	StatsdReporter reporter = reporterFactory.build(null);
+
+            SortedMap<String, Gauge> gauges = new TreeMap<>();
+            gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
+            gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
+
+            reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
+
+            sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
+
+            // Check that both gauge metrics were received and app id is dropped
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
+            assertFalse(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
+            assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
+            assertEquals(1, server.receivedMessages().size());
+
+        }
+    }
 
     private StatsdReporter buildTestReporter(int testUdpPort) {
-        return StatsdReporter
-                .forRegistry(null)
-                .formatter(formatter)
-                .host("localhost")
-                .port(testUdpPort)
-                .build();
+    	StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+    	reporterFactory.setFormatter(formatter);
+    	reporterFactory.setHost("localhost");
+    	reporterFactory.setPort(testUdpPort);
+        return reporterFactory.build(null);
     }
 
     private void assertThatExists(DatagramTestServer server, String expectedMetricNamePrefix, String expectedMetricArgumentName, String expectedValueAndType) {

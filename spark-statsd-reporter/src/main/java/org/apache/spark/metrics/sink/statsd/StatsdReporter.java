@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.Map;
 import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -19,9 +22,11 @@ public class StatsdReporter extends ScheduledReporter {
     private final static Logger logger = LoggerFactory.getLogger(StatsdReporter.class);
     private final InetSocketAddress address;
     private final MetricFormatter metricFormatter;
+    private MetricFilter filter;
 
     protected StatsdReporter(MetricRegistry registry, MetricFormatter metricFormatter, String reporterName, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, String host, int port) {
         super(registry, reporterName, filter, rateUnit, durationUnit);
+        this.filter = filter;
         this.address = new InetSocketAddress(host, port);
         this.metricFormatter = metricFormatter;
     }
@@ -30,17 +35,27 @@ public class StatsdReporter extends ScheduledReporter {
     public void report(SortedMap<String, Gauge> gauges, SortedMap<String, Counter> counters, SortedMap<String, Histogram> histograms, SortedMap<String, Meter> meters, SortedMap<String, Timer> timers) {
         try (DatagramSocket socket = new DatagramSocket()) {
             try {
-                reportGauges(gauges, socket);
-                reportCounters(counters, socket);
-                reportHistograms(histograms, socket);
-                reportMeters(meters, socket);
-                reportTimers(timers, socket);
+                reportGauges(getFilteredMetrics(gauges), socket);
+                reportCounters(getFilteredMetrics(counters), socket);
+                reportHistograms(getFilteredMetrics(histograms), socket);
+                reportMeters(getFilteredMetrics(meters), socket);
+                reportTimers(getFilteredMetrics(timers), socket);
             } catch (StatsdReporterException e) {
                 logger.warn("Unable to send packets to StatsD", e);
             }
         } catch (IOException e) {
             logger.warn("StatsD datagram socket construction failed", e);
         }
+    }
+    
+    private <T extends Metric> SortedMap<String, T> getFilteredMetrics(SortedMap<String, T> metrics) {
+    	final TreeMap<String, T> filteredMetrics = new TreeMap<>();
+        for (Map.Entry<String, T> entry : metrics.entrySet()) {
+            if (filter.matches(entry.getKey(), entry.getValue())) {
+            	filteredMetrics.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return Collections.unmodifiableSortedMap(filteredMetrics);
     }
 
     private void reportGauges(SortedMap<String, Gauge> gauges, DatagramSocket socket) {
@@ -59,7 +74,6 @@ public class StatsdReporter extends ScheduledReporter {
         histograms.forEach((name, histogram) -> {
             Snapshot snapshot = histogram.getSnapshot();
             send(socket,
-
                     metricFormatter.buildMetricString(name, "count", histogram.getCount(), GAUGE),
                     metricFormatter.buildMetricString(name, "max", snapshot.getMax(), TIMER),
                     metricFormatter.buildMetricString(name, "mean", snapshot.getMean(), TIMER),
@@ -111,13 +125,13 @@ public class StatsdReporter extends ScheduledReporter {
 
     private void send(DatagramSocket socket, String...metrics) {
         for (String metric: metrics) {
-            byte[] bytes = metric.getBytes(UTF_8);
-            DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address);
-            try {
-                socket.send(packet);
-            } catch (IOException e) {
-                throw new StatsdReporterException(e);
-            }
-        }
+    		byte[] bytes = metric.getBytes(UTF_8);
+    		DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address);
+    		try {
+    			socket.send(packet);
+    		} catch (IOException e) {
+    			throw new StatsdReporterException(e);
+    		}
+    	}
     }
 }
