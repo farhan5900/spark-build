@@ -10,6 +10,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -209,7 +211,7 @@ public class StatsdReporterTest {
     }
     
     @Test
-    public void testInludeFilter() throws Exception {
+    public void testIncludeFilter() throws Exception {
         final int testUdpPort = 4446;
         try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
         	ImmutableSet<String> includes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeFloat".split(","));
@@ -236,6 +238,74 @@ public class StatsdReporterTest {
 
         }
     }
+    
+    @Test
+    public void testAttributeExcludeFilter() throws Exception {
+        final int testUdpPort = 4447;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+        	EnumSet<MetricAttribute> excludesAttributes = EnumSet.copyOf(Arrays.asList(MetricAttribute.COUNT));
+        	StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+        	reporterFactory.setFormatter(formatter);
+        	reporterFactory.setHost("localhost");
+        	reporterFactory.setPort(testUdpPort);
+        	reporterFactory.setExcludesAttributes(excludesAttributes);
+        	StatsdReporter reporter = reporterFactory.build(null);
+
+        	SortedMap<String, Meter> meters = new TreeMap<>();
+            Meter meter = new Meter();
+            meter.mark();
+            meter.mark(2);
+            meters.put("test-app-01.driver.TestMeter", meter);
+
+            reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
+
+            sleep(100);
+
+            String prefix = "spark.driver.testmeter.";
+            assertThatNotExists(server, prefix, "count", "3|g");
+            assertThatExists(server, prefix, "m1_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m5_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m15_rate", "0.00|ms");
+            // mean value depends on the timing and can't be predicted for the test
+            assertThatExists(server, prefix, "mean_rate", "|ms");
+            assertEquals(4, server.receivedMessages().size());
+
+        }
+    }
+    
+    @Test
+    public void testAttributeIncludeFilter() throws Exception {
+        final int testUdpPort = 4448;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+        	EnumSet<MetricAttribute> includesAttributes = EnumSet.copyOf(Arrays.asList(MetricAttribute.COUNT));
+        	StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+        	reporterFactory.setFormatter(formatter);
+        	reporterFactory.setHost("localhost");
+        	reporterFactory.setPort(testUdpPort);
+        	reporterFactory.setIncludesAttributes(includesAttributes);
+        	StatsdReporter reporter = reporterFactory.build(null);
+
+        	SortedMap<String, Meter> meters = new TreeMap<>();
+            Meter meter = new Meter();
+            meter.mark();
+            meter.mark(2);
+            meters.put("test-app-01.driver.TestMeter", meter);
+
+            reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
+
+            sleep(100);
+
+            String prefix = "spark.driver.testmeter.";
+            assertThatExists(server, prefix, "count", "3|g");
+            assertThatNotExists(server, prefix, "m1_rate", "0.00|ms");
+            assertThatNotExists(server, prefix, "m5_rate", "0.00|ms");
+            assertThatNotExists(server, prefix, "m15_rate", "0.00|ms");
+            // mean value depends on the timing and can't be predicted for the test
+            assertThatNotExists(server, prefix, "mean_rate", "|ms");
+            assertEquals(1, server.receivedMessages().size());
+
+        }
+    }
 
     private StatsdReporter buildTestReporter(int testUdpPort) {
     	StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
@@ -247,6 +317,12 @@ public class StatsdReporterTest {
 
     private void assertThatExists(DatagramTestServer server, String expectedMetricNamePrefix, String expectedMetricArgumentName, String expectedValueAndType) {
         assertTrue(server.receivedMessages().stream().anyMatch(
+                s -> s.startsWith(expectedMetricNamePrefix + expectedMetricArgumentName)
+                        && s.endsWith(expectedValueAndType)));
+    }
+    
+    private void assertThatNotExists(DatagramTestServer server, String expectedMetricNamePrefix, String expectedMetricArgumentName, String expectedValueAndType) {
+        assertFalse(server.receivedMessages().stream().anyMatch(
                 s -> s.startsWith(expectedMetricNamePrefix + expectedMetricArgumentName)
                         && s.endsWith(expectedValueAndType)));
     }
