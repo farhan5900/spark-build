@@ -1,8 +1,5 @@
 package org.apache.spark.metrics.sink.statsd;
 
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.MetricAttribute;
-import com.codahale.metrics.MetricFilter;
 import com.codahale.metrics.MetricRegistry;
 
 import io.dropwizard.metrics.BaseReporterFactory;

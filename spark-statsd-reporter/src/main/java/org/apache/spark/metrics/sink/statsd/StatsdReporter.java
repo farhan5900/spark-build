@@ -89,39 +89,17 @@ public class StatsdReporter extends ScheduledReporter {
         histograms.forEach((name, histogram) -> {
             Snapshot snapshot = histogram.getSnapshot();
             List<String> metrics = new ArrayList<>();
-            if (attributeFilter.matches(MetricAttribute.COUNT)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "count", histogram.getCount(), GAUGE));
-            }
-            if (attributeFilter.matches(MetricAttribute.MAX)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "max", snapshot.getMax(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.MEAN)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "mean", snapshot.getMean(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.MIN)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "min", snapshot.getMin(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.STDDEV)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "stddev", snapshot.getStdDev(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P50)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p50", snapshot.getMedian(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P75)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p75", snapshot.get75thPercentile(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P95)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p95", snapshot.get95thPercentile(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P98)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p98", snapshot.get98thPercentile(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P99)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p99", snapshot.get99thPercentile(), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P999)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p999", snapshot.get999thPercentile(), TIMER));
-            }
+            addIfMatches(metrics, MetricAttribute.COUNT, metricFormatter.buildMetricString(name, MetricAttribute.COUNT.toString(), histogram.getCount(), GAUGE));
+            addIfMatches(metrics, MetricAttribute.MAX, metricFormatter.buildMetricString(name, MetricAttribute.MAX.toString(), snapshot.getMax(), TIMER));
+            addIfMatches(metrics, MetricAttribute.MEAN, metricFormatter.buildMetricString(name, MetricAttribute.MEAN.toString(), snapshot.getMean(), TIMER));
+            addIfMatches(metrics, MetricAttribute.MIN, metricFormatter.buildMetricString(name, MetricAttribute.MIN.toString(), snapshot.getMin(), TIMER));
+            addIfMatches(metrics, MetricAttribute.STDDEV, metricFormatter.buildMetricString(name, MetricAttribute.STDDEV.toString(), snapshot.getStdDev(), TIMER));
+            addIfMatches(metrics, MetricAttribute.P50, metricFormatter.buildMetricString(name, MetricAttribute.P50.toString(), snapshot.getMedian(), TIMER));
+            addIfMatches(metrics, MetricAttribute.P75, metricFormatter.buildMetricString(name, MetricAttribute.P75.toString(), snapshot.get75thPercentile(), TIMER));
+            addIfMatches(metrics, MetricAttribute.P95, metricFormatter.buildMetricString(name, MetricAttribute.P95.toString(), snapshot.get95thPercentile(), TIMER));
+            addIfMatches(metrics, MetricAttribute.P98, metricFormatter.buildMetricString(name, MetricAttribute.P98.toString(), snapshot.get98thPercentile(), TIMER));
+            addIfMatches(metrics, MetricAttribute.P99, metricFormatter.buildMetricString(name, MetricAttribute.P99.toString(), snapshot.get99thPercentile(), TIMER));
+            addIfMatches(metrics, MetricAttribute.P999, metricFormatter.buildMetricString(name, MetricAttribute.P999.toString(), snapshot.get999thPercentile(), TIMER));
             send(socket, metrics.toArray(new String[metrics.size()]));
         });
     }
@@ -129,21 +107,11 @@ public class StatsdReporter extends ScheduledReporter {
     private void reportMeters(SortedMap<String, Meter> meters, DatagramSocket socket) {
         meters.forEach((name, meter) -> {
         	List<String> metrics = new ArrayList<>();
-        	if (attributeFilter.matches(MetricAttribute.COUNT)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "count", meter.getCount(), GAUGE));
-            }
-        	if (attributeFilter.matches(MetricAttribute.M1_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "m1_rate", convertRate(meter.getOneMinuteRate()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.M5_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "m5_rate", convertRate(meter.getFiveMinuteRate()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.M15_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "m15_rate", convertRate(meter.getFifteenMinuteRate()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.MEAN_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "mean_rate", convertRate(meter.getMeanRate()), TIMER));
-            }
+        	addIfMatches(metrics, MetricAttribute.COUNT, metricFormatter.buildMetricString(name, MetricAttribute.COUNT.toString(), meter.getCount(), GAUGE));
+        	addIfMatches(metrics, MetricAttribute.M1_RATE, metricFormatter.buildMetricString(name, MetricAttribute.M1_RATE.toString(), convertRate(meter.getOneMinuteRate()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.M5_RATE, metricFormatter.buildMetricString(name, MetricAttribute.M5_RATE.toString(), convertRate(meter.getFiveMinuteRate()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.M15_RATE, metricFormatter.buildMetricString(name, MetricAttribute.M15_RATE.toString(), convertRate(meter.getFifteenMinuteRate()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.MEAN_RATE, metricFormatter.buildMetricString(name, MetricAttribute.MEAN_RATE.toString(), convertRate(meter.getMeanRate()), TIMER));
             send(socket, metrics.toArray(new String[metrics.size()]));
         });
     }
@@ -152,48 +120,20 @@ public class StatsdReporter extends ScheduledReporter {
         timers.forEach((name, timer) -> {
             Snapshot snapshot = timer.getSnapshot();
             List<String> metrics = new ArrayList<>();
-            if (attributeFilter.matches(MetricAttribute.MAX)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "max", convertDuration(snapshot.getMax()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.MEAN)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "mean", convertDuration(snapshot.getMean()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.MIN)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "min", convertDuration(snapshot.getMin()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.STDDEV)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "stddev", convertDuration(snapshot.getStdDev()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P50)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p50", convertDuration(snapshot.getMedian()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P75)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p75", convertDuration(snapshot.get75thPercentile()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P95)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p95", convertDuration(snapshot.get95thPercentile()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P98)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p98", convertDuration(snapshot.get98thPercentile()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P99)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p99", convertDuration(snapshot.get99thPercentile()), TIMER));
-            }
-            if (attributeFilter.matches(MetricAttribute.P999)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "p999", convertDuration(snapshot.get999thPercentile()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.M1_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "m1_rate", convertRate(timer.getOneMinuteRate()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.M5_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "m5_rate", convertRate(timer.getFiveMinuteRate()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.M15_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "m15_rate", convertRate(timer.getFifteenMinuteRate()), TIMER));
-            }
-        	if (attributeFilter.matches(MetricAttribute.MEAN_RATE)) {
-            	metrics.add(metricFormatter.buildMetricString(name, "mean_rate", convertRate(timer.getMeanRate()), TIMER));
-            }
+            addIfMatches(metrics, MetricAttribute.MAX, metricFormatter.buildMetricString(name, MetricAttribute.MAX.toString(), convertDuration(snapshot.getMax()), TIMER));
+            addIfMatches(metrics, MetricAttribute.MEAN, metricFormatter.buildMetricString(name, MetricAttribute.MEAN.toString(), convertDuration(snapshot.getMean()), TIMER));
+            addIfMatches(metrics, MetricAttribute.MIN, metricFormatter.buildMetricString(name, MetricAttribute.MIN.toString(), convertDuration(snapshot.getMin()), TIMER));
+            addIfMatches(metrics, MetricAttribute.STDDEV, metricFormatter.buildMetricString(name, MetricAttribute.STDDEV.toString(), convertDuration(snapshot.getStdDev()), TIMER));
+            addIfMatches(metrics, MetricAttribute.P50, metricFormatter.buildMetricString(name, MetricAttribute.P50.toString(), convertDuration(snapshot.getMedian()), TIMER));
+            addIfMatches(metrics, MetricAttribute.P75, metricFormatter.buildMetricString(name, MetricAttribute.P75.toString(), convertDuration(snapshot.get75thPercentile()), TIMER));
+            addIfMatches(metrics, MetricAttribute.P95, metricFormatter.buildMetricString(name, MetricAttribute.P95.toString(), convertDuration(snapshot.get95thPercentile()), TIMER));
+            addIfMatches(metrics, MetricAttribute.P98, metricFormatter.buildMetricString(name, MetricAttribute.P98.toString(), convertDuration(snapshot.get98thPercentile()), TIMER));
+            addIfMatches(metrics, MetricAttribute.P99, metricFormatter.buildMetricString(name, MetricAttribute.P99.toString(), convertDuration(snapshot.get99thPercentile()), TIMER));
+            addIfMatches(metrics, MetricAttribute.P999, metricFormatter.buildMetricString(name, MetricAttribute.P999.toString(), convertDuration(snapshot.get999thPercentile()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.M1_RATE, metricFormatter.buildMetricString(name, MetricAttribute.M1_RATE.toString(), convertRate(timer.getOneMinuteRate()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.M5_RATE, metricFormatter.buildMetricString(name, MetricAttribute.M5_RATE.toString(), convertRate(timer.getFiveMinuteRate()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.M15_RATE, metricFormatter.buildMetricString(name, MetricAttribute.M15_RATE.toString(), convertRate(timer.getFifteenMinuteRate()), TIMER));
+        	addIfMatches(metrics, MetricAttribute.MEAN_RATE, metricFormatter.buildMetricString(name, MetricAttribute.MEAN_RATE.toString(), convertRate(timer.getMeanRate()), TIMER));
             send(socket, metrics.toArray(new String[metrics.size()]));
         });
     }
@@ -208,5 +148,11 @@ public class StatsdReporter extends ScheduledReporter {
     			throw new StatsdReporterException(e);
     		}
     	}
+    }
+    
+    private void addIfMatches(List<String> metrics, MetricAttribute metricAttribute, String metric) {
+    	if (attributeFilter.matches(metricAttribute)) {
+        	metrics.add(metric);
+        }
     }
 }
