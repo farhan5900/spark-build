@@ -30,6 +30,9 @@ sed -i "s,<DISPATCHER_URL>,${SCHEME}://${SPARK_LOCAL_IP}:${DISPATCHER_PORT}," /e
 sed -i "s,<DISPATCHER_UI_URL>,http://${SPARK_LOCAL_IP}:${DISPATCHER_UI_PORT}," /etc/nginx/conf.d/spark.conf
 sed -i "s,<PROTOCOL>,${SPARK_SSL_PROTOCOL}," /etc/nginx/conf.d/spark.conf
 
+cp /mnt/mesos/sandbox/.ssl/scheduler.crt /etc/nginx/spark.crt
+cp /mnt/mesos/sandbox/.ssl/scheduler.key /etc/nginx/spark.key
+
 # Disabled algorithms for Nginx because it crashes with the usual multi-1000
 # bytes cipher strings of Java.
 # sed -i "s,<ENABLED_ALGORITHMS>,${SPARK_SSL_ENABLEDALGORITHMS//,/:}," /etc/nginx/conf.d/spark.conf
