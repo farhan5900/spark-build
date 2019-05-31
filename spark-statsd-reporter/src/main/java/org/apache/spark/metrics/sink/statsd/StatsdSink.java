@@ -18,96 +18,101 @@ import static org.apache.spark.metrics.sink.statsd.Configuration.Defaults;
 import static org.apache.spark.metrics.sink.statsd.Configuration.Keys;
 
 public class StatsdSink implements Sink {
-    private final static Logger logger = LoggerFactory.getLogger(StatsdSink.class);
-    private final StatsdReporter reporter;
+	private final static Logger logger = LoggerFactory.getLogger(StatsdSink.class);
+	private final StatsdReporter reporter;
 
-    private int pollInterval;
-    private TimeUnit pollUnit;
-    private final String prefix;
+	private int pollInterval;
+	private TimeUnit pollUnit;
+	private final String prefix;
 
-    public StatsdSink(Properties properties, MetricRegistry registry, org.apache.spark.SecurityManager securityMgr) {
-        logger.info("Starting StatsdSink with properties:\n" + properties.toString());
-        this.prefix = properties.getProperty(Keys.PREFIX, Defaults.PREFIX);
-        this.pollInterval = Integer.parseInt(properties.getProperty(Keys.POLL_INTERVAL, Defaults.POLL_INTERVAL));
-        this.pollUnit = TimeUnit.valueOf(properties.getProperty(Keys.POLL_UNIT, Defaults.POLL_UNIT).toUpperCase());
+	public StatsdSink(Properties properties, MetricRegistry registry, org.apache.spark.SecurityManager securityMgr) {
+		logger.info("Starting StatsdSink with properties:\n" + properties.toString());
+		this.prefix = properties.getProperty(Keys.PREFIX, Defaults.PREFIX);
+		this.pollInterval = Integer.parseInt(properties.getProperty(Keys.POLL_INTERVAL, Defaults.POLL_INTERVAL));
+		this.pollUnit = TimeUnit.valueOf(properties.getProperty(Keys.POLL_UNIT, Defaults.POLL_UNIT).toUpperCase());
 
-        String host = properties.getProperty(Keys.HOST, Defaults.HOST);
-        int port = Integer.parseInt(properties.getProperty(Keys.PORT, Defaults.PORT));
+		String host = properties.getProperty(Keys.HOST, Defaults.HOST);
+		int port = Integer.parseInt(properties.getProperty(Keys.PORT, Defaults.PORT));
 
-        TimeUnit rateUnit = TimeUnit.valueOf(properties.getProperty(Keys.RATE_UNIT, Defaults.RATE_UNIT).toUpperCase());
-        TimeUnit durationUnit = TimeUnit.valueOf(properties.getProperty(Keys.DURATION_UNIT, Defaults.DURATION_UNIT).toUpperCase());
-        
-        String excludes = properties.getProperty(Keys.EXCLUDES, Defaults.EXCLUDES);
-        String includes = properties.getProperty(Keys.INCLUDES, Defaults.INCLUDES);
-        
-        String excludesAttributes = properties.getProperty(Keys.EXCLUDES_ATTRIBUTES, Defaults.EXCLUDES_ATTRIBUTES).toUpperCase();
-        String includesAttributes = properties.getProperty(Keys.INCLUDES_ATTRIBUTES, Defaults.INCLUDES_ATTRIBUTES).toUpperCase();
-        
-        boolean useRegexFilters = Boolean.parseBoolean(properties.getProperty(Keys.USE_REGEX_FILTERS, Defaults.USE_REGEX_FILTERS));
-        boolean useSubstringMatching = Boolean.parseBoolean(properties.getProperty(Keys.USE_SUBSTRING_MATCHING, Defaults.USE_SUBSTRING_MATCHING));
+		TimeUnit rateUnit = TimeUnit.valueOf(properties.getProperty(Keys.RATE_UNIT, Defaults.RATE_UNIT).toUpperCase());
+		TimeUnit durationUnit = TimeUnit
+				.valueOf(properties.getProperty(Keys.DURATION_UNIT, Defaults.DURATION_UNIT).toUpperCase());
 
-        String[] tags = properties.getProperty(Keys.TAGS, Defaults.TAGS).split(",");
-        
-        StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-        
-        reporterFactory.setHost(host);
-        reporterFactory.setPort(port);
-        reporterFactory.setPrefix(prefix);
-        reporterFactory.setRateUnit(rateUnit);
-        reporterFactory.setDurationUnit(durationUnit);
-        reporterFactory.setFormatter(new MetricFormatter(new InstanceDetailsProvider(), prefix, tags));
-        
-        if(!excludes.isEmpty()) {
-        	reporterFactory.setExcludes(parseMetricsString(excludes));
-        }
-        
-        if(!includes.isEmpty()) {
-		    reporterFactory.setIncludes(parseMetricsString(includes));
+		String excludes = properties.getProperty(Keys.EXCLUDES, Defaults.EXCLUDES);
+		String includes = properties.getProperty(Keys.INCLUDES, Defaults.INCLUDES);
+
+		String excludesAttributes = properties.getProperty(Keys.EXCLUDES_ATTRIBUTES, Defaults.EXCLUDES_ATTRIBUTES)
+				.toUpperCase();
+		String includesAttributes = properties.getProperty(Keys.INCLUDES_ATTRIBUTES, Defaults.INCLUDES_ATTRIBUTES)
+				.toUpperCase();
+
+		boolean useRegexFilters = Boolean
+				.parseBoolean(properties.getProperty(Keys.USE_REGEX_FILTERS, Defaults.USE_REGEX_FILTERS));
+		boolean useSubstringMatching = Boolean
+				.parseBoolean(properties.getProperty(Keys.USE_SUBSTRING_MATCHING, Defaults.USE_SUBSTRING_MATCHING));
+
+		String[] tags = properties.getProperty(Keys.TAGS, Defaults.TAGS).split(",");
+
+		StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+
+		reporterFactory.setHost(host);
+		reporterFactory.setPort(port);
+		reporterFactory.setRateUnit(rateUnit);
+		reporterFactory.setDurationUnit(durationUnit);
+		reporterFactory.setFormatter(new MetricFormatter(new InstanceDetailsProvider(), prefix, tags));
+
+		if (!excludes.isEmpty()) {
+			reporterFactory.setExcludes(parseMetricsString(excludes));
 		}
-        
-        if(!excludesAttributes.isEmpty()) {
-		    reporterFactory.setExcludesAttributes(parseAttributesString(excludesAttributes));
+
+		if (!includes.isEmpty()) {
+			reporterFactory.setIncludes(parseMetricsString(includes));
 		}
-        
-        if(!includesAttributes.isEmpty()) {
-		    reporterFactory.setIncludesAttributes(parseAttributesString(includesAttributes));
+
+		if (!excludesAttributes.isEmpty()) {
+			reporterFactory.setExcludesAttributes(parseAttributesString(excludesAttributes));
 		}
-        
-        reporterFactory.setUseRegexFilters(useRegexFilters);
-        reporterFactory.setUseSubstringMatching(useSubstringMatching);
-        
-        this.reporter = reporterFactory.build(registry);
-    }
 
-    @Override
-    public void start() {
-        reporter.start(pollInterval, pollUnit);
-        logger.info("StatsdSink started with prefix: " + prefix);
-    }
+		if (!includesAttributes.isEmpty()) {
+			reporterFactory.setIncludesAttributes(parseAttributesString(includesAttributes));
+		}
 
-    @Override
-    public void stop() {
-        reporter.stop();
-        logger.info("StatsdSink stopped");
-    }
+		reporterFactory.setUseRegexFilters(useRegexFilters);
+		reporterFactory.setUseSubstringMatching(useSubstringMatching);
 
-    /**
-     * This method is called by SparkContext, Executors, and Spark Standalone instances prior to shutting down
-     */
-    @Override
-    public void report(){
-        reporter.report();
-    }
-    
-    private ImmutableSet<String> parseMetricsString(String metrics) {
-    	return ImmutableSet.copyOf(metrics.split(","));
-    }
-    
-    private EnumSet<MetricAttribute> parseAttributesString(String metricsAttributes) {
-    	List<MetricAttribute> listOfAttributes = new ArrayList<>();
-    	for(String attribute: metricsAttributes.split(",")) {
-    		listOfAttributes.add(MetricAttribute.valueOf(attribute));
-    	}
-    	return EnumSet.copyOf(listOfAttributes);
-    }
+		this.reporter = reporterFactory.build(registry);
+	}
+
+	@Override
+	public void start() {
+		reporter.start(pollInterval, pollUnit);
+		logger.info("StatsdSink started with prefix: " + prefix);
+	}
+
+	@Override
+	public void stop() {
+		reporter.stop();
+		logger.info("StatsdSink stopped");
+	}
+
+	/**
+	 * This method is called by SparkContext, Executors, and Spark Standalone
+	 * instances prior to shutting down
+	 */
+	@Override
+	public void report() {
+		reporter.report();
+	}
+
+	private ImmutableSet<String> parseMetricsString(String metrics) {
+		return ImmutableSet.copyOf(metrics.split(","));
+	}
+
+	private EnumSet<MetricAttribute> parseAttributesString(String metricsAttributes) {
+		List<MetricAttribute> listOfAttributes = new ArrayList<>();
+		for (String attribute : metricsAttributes.split(",")) {
+			listOfAttributes.add(MetricAttribute.valueOf(attribute));
+		}
+		return EnumSet.copyOf(listOfAttributes);
+	}
 }
