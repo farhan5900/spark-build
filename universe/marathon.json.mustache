@@ -191,17 +191,18 @@
     "healthChecks": [
         {
             {{#service.tls.enabled}}
-            "protocol": "MESOS_HTTPS",
+            "protocol": "COMMAND",
+            "command": { "value": "/bin/spark_health.sh" }
             {{/service.tls.enabled}}
             {{^service.tls.enabled}}
             "protocol": "MESOS_HTTP",
-            {{/service.tls.enabled}}
             "path": "/",
             "portIndex": 2,
             "gracePeriodSeconds": 5,
             "intervalSeconds": 60,
             "timeoutSeconds": 10,
             "maxConsecutiveFailures": 3
+            {{/service.tls.enabled}}
         }
     ],
 
