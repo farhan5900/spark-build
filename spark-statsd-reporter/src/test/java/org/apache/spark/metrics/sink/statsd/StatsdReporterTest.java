@@ -24,308 +24,303 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class StatsdReporterTest {
 
-	private MetricFormatter formatter;
+    private MetricFormatter formatter;
 
-	@Before
-	public void setupFormatter() {
-		InstanceDetailsProvider provider = Mockito.mock(InstanceDetailsProvider.class);
+    @Before
+    public void setupFormatter() {
+        InstanceDetailsProvider provider = Mockito.mock(InstanceDetailsProvider.class);
 
-		when(provider.getInstanceDetails()).thenReturn(Optional.of(new InstanceDetails("test-app-01", "Test Spark App",
-				InstanceType.DRIVER, "test-instance-01", "default")));
-		String[] tags = {};
-		this.formatter = new MetricFormatter(provider, "spark", tags);
-	}
+        when(provider.getInstanceDetails()).thenReturn(Optional.of(new InstanceDetails("test-app-01", "Test Spark App",
+                InstanceType.DRIVER, "test-instance-01", "default")));
+        String[] tags = {};
+        this.formatter = new MetricFormatter(provider, "spark", tags);
+    }
 
-	@Test
-	public void testGauges() throws Exception {
-		final int testUdpPort = 4440;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			StatsdReporter reporter = buildTestReporter(testUdpPort);
+    @Test
+    public void testGauges() throws Exception {
+        final int testUdpPort = 4440;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            StatsdReporter reporter = buildTestReporter(testUdpPort);
 
-			SortedMap<String, Gauge> gauges = new TreeMap<>();
-			gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
-			gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
+            SortedMap<String, Gauge> gauges = new TreeMap<>();
+            gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
+            gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
 
-			reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
+            reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
 
-			sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
+            sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
 
-			// Check that both gauge metrics were received and app id is dropped
-			assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
-			assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
-			assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
-			assertEquals(2, server.receivedMessages().size());
+            // Check that both gauge metrics were received and app id is dropped
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
+            assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
+            assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
+            assertEquals(2, server.receivedMessages().size());
+        }
+    }
 
-		}
-	}
+    @Test
+    public void testCounters() throws Exception {
+        final int testUdpPort = 4441;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            StatsdReporter reporter = buildTestReporter(testUdpPort);
 
-	@Test
-	public void testCounters() throws Exception {
-		final int testUdpPort = 4441;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			StatsdReporter reporter = buildTestReporter(testUdpPort);
+            SortedMap<String, Counter> counters = new TreeMap<>();
+            Counter counter = new Counter();
+            counter.inc();
+            counter.inc(2);
+            counters.put("test-app-01.driver.TestCounter", counter);
 
-			SortedMap<String, Counter> counters = new TreeMap<>();
-			Counter counter = new Counter();
-			counter.inc();
-			counter.inc(2);
-			counters.put("test-app-01.driver.TestCounter", counter);
+            reporter.report(new TreeMap<>(), counters, new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
 
-			reporter.report(new TreeMap<>(), counters, new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
+            sleep(100);
 
-			sleep(100);
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testcounter")));
+            // counters must be reported as gauges due to StatsD specifics: it treats values
+            // as independent increments
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.endsWith(":3|g")));
+            assertEquals(1, server.receivedMessages().size());
+        }
+    }
 
-			assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testcounter")));
-			// counters must be reported as gauges due to StatsD specifics: it treats values
-			// as independent increments
-			assertTrue(server.receivedMessages().stream().allMatch(s -> s.endsWith(":3|g")));
-			assertEquals(1, server.receivedMessages().size());
-		}
-	}
+    @Test
+    public void testHistograms() throws Exception {
+        final int testUdpPort = 4442;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            StatsdReporter reporter = buildTestReporter(testUdpPort);
 
-	@Test
-	public void testHistograms() throws Exception {
-		final int testUdpPort = 4442;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			StatsdReporter reporter = buildTestReporter(testUdpPort);
+            SortedMap<String, Histogram> histograms = new TreeMap<>();
+            Histogram histogram = new Histogram(new ExponentiallyDecayingReservoir());
+            histogram.update(1);
+            histogram.update(2);
+            histogram.update(4);
+            histogram.update(0);
+            histogram.update(6);
+            histograms.put("test-app-01.driver.TestHistogram", histogram);
 
-			SortedMap<String, Histogram> histograms = new TreeMap<>();
-			Histogram histogram = new Histogram(new ExponentiallyDecayingReservoir());
-			histogram.update(1);
-			histogram.update(2);
-			histogram.update(4);
-			histogram.update(0);
-			histogram.update(6);
-			histograms.put("test-app-01.driver.TestHistogram", histogram);
+            reporter.report(new TreeMap<>(), new TreeMap<>(), histograms, new TreeMap<>(), new TreeMap<>());
 
-			reporter.report(new TreeMap<>(), new TreeMap<>(), histograms, new TreeMap<>(), new TreeMap<>());
+            sleep(100);
 
-			sleep(100);
+            String prefix = "spark.driver.testhistogram.";
+            assertThatExists(server, prefix, "count", "5|g");
+            assertThatExists(server, prefix, "max", "6|ms");
+            assertThatExists(server, prefix, "mean", "2.60|ms");
+            assertThatExists(server, prefix, "min", "0|ms");
+            assertThatExists(server, prefix, "stddev", "2.15|ms");
+            assertThatExists(server, prefix, "p50", "2.00|ms");
+            assertThatExists(server, prefix, "p75", "4.00|ms");
+            assertThatExists(server, prefix, "p95", "6.00|ms");
+            assertThatExists(server, prefix, "p98", "6.00|ms");
+            assertThatExists(server, prefix, "p99", "6.00|ms");
+            assertThatExists(server, prefix, "p999", "6.00|ms");
+            assertEquals(11, server.receivedMessages().size());
+        }
+    }
 
-			String prefix = "spark.driver.testhistogram.";
-			assertThatExists(server, prefix, "count", "5|g");
-			assertThatExists(server, prefix, "max", "6|ms");
-			assertThatExists(server, prefix, "mean", "2.60|ms");
-			assertThatExists(server, prefix, "min", "0|ms");
-			assertThatExists(server, prefix, "stddev", "2.15|ms");
-			assertThatExists(server, prefix, "p50", "2.00|ms");
-			assertThatExists(server, prefix, "p75", "4.00|ms");
-			assertThatExists(server, prefix, "p95", "6.00|ms");
-			assertThatExists(server, prefix, "p98", "6.00|ms");
-			assertThatExists(server, prefix, "p99", "6.00|ms");
-			assertThatExists(server, prefix, "p999", "6.00|ms");
-			assertEquals(11, server.receivedMessages().size());
-		}
-	}
+    @Test
+    public void testMeters() throws Exception {
+        final int testUdpPort = 4443;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            StatsdReporter reporter = buildTestReporter(testUdpPort);
 
-	@Test
-	public void testMeters() throws Exception {
-		final int testUdpPort = 4443;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			StatsdReporter reporter = buildTestReporter(testUdpPort);
+            SortedMap<String, Meter> meters = new TreeMap<>();
+            Meter meter = new Meter();
+            meter.mark();
+            meter.mark(2);
+            meters.put("test-app-01.driver.TestMeter", meter);
 
-			SortedMap<String, Meter> meters = new TreeMap<>();
-			Meter meter = new Meter();
-			meter.mark();
-			meter.mark(2);
-			meters.put("test-app-01.driver.TestMeter", meter);
+            reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
 
-			reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
+            sleep(100);
 
-			sleep(100);
+            String prefix = "spark.driver.testmeter.";
+            assertThatExists(server, prefix, "count", "3|g");
+            assertThatExists(server, prefix, "m1_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m5_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m15_rate", "0.00|ms");
+            // mean value depends on the timing and can't be predicted for the test
+            assertThatExists(server, prefix, "mean_rate", "|ms");
+            assertEquals(5, server.receivedMessages().size());
+        }
+    }
 
-			String prefix = "spark.driver.testmeter.";
-			assertThatExists(server, prefix, "count", "3|g");
-			assertThatExists(server, prefix, "m1_rate", "0.00|ms");
-			assertThatExists(server, prefix, "m5_rate", "0.00|ms");
-			assertThatExists(server, prefix, "m15_rate", "0.00|ms");
-			// mean value depends on the timing and can't be predicted for the test
-			assertThatExists(server, prefix, "mean_rate", "|ms");
-			assertEquals(5, server.receivedMessages().size());
-		}
-	}
+    @Test
+    public void testTimers() throws Exception {
+        final int testUdpPort = 4444;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            StatsdReporter reporter = buildTestReporter(testUdpPort);
 
-	@Test
-	public void testTimers() throws Exception {
-		final int testUdpPort = 4444;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			StatsdReporter reporter = buildTestReporter(testUdpPort);
+            SortedMap<String, Timer> timers = new TreeMap<>();
+            Timer timer = new Timer();
+            Timer.Context timerContext = timer.time();
+            sleep(100);
+            timerContext.stop();
+            timers.put("test-app-01.driver.TestTimer", timer);
 
-			SortedMap<String, Timer> timers = new TreeMap<>();
-			Timer timer = new Timer();
-			Timer.Context timerContext = timer.time();
-			sleep(100);
-			timerContext.stop();
-			timers.put("test-app-01.driver.TestTimer", timer);
+            reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), timers);
 
-			reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), timers);
+            sleep(100);
 
-			sleep(100);
+            String prefix = "spark.driver.testtimer.";
+            assertThatExists(server, prefix, "max", "|ms");
+            assertThatExists(server, prefix, "mean", "|ms");
+            assertThatExists(server, prefix, "min", "|ms");
+            assertThatExists(server, prefix, "stddev", "|ms");
+            assertThatExists(server, prefix, "p50", "|ms");
+            assertThatExists(server, prefix, "p75", "|ms");
+            assertThatExists(server, prefix, "p95", "|ms");
+            assertThatExists(server, prefix, "p98", "|ms");
+            assertThatExists(server, prefix, "p99", "|ms");
+            assertThatExists(server, prefix, "p999", "|ms");
+            assertThatExists(server, prefix, "m1_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m5_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m15_rate", "0.00|ms");
+            assertThatExists(server, prefix, "mean_rate", "|ms");
+            assertEquals(14, server.receivedMessages().size());
+        }
+    }
 
-			String prefix = "spark.driver.testtimer.";
-			assertThatExists(server, prefix, "max", "|ms");
-			assertThatExists(server, prefix, "mean", "|ms");
-			assertThatExists(server, prefix, "min", "|ms");
-			assertThatExists(server, prefix, "stddev", "|ms");
-			assertThatExists(server, prefix, "p50", "|ms");
-			assertThatExists(server, prefix, "p75", "|ms");
-			assertThatExists(server, prefix, "p95", "|ms");
-			assertThatExists(server, prefix, "p98", "|ms");
-			assertThatExists(server, prefix, "p99", "|ms");
-			assertThatExists(server, prefix, "p999", "|ms");
-			assertThatExists(server, prefix, "m1_rate", "0.00|ms");
-			assertThatExists(server, prefix, "m5_rate", "0.00|ms");
-			assertThatExists(server, prefix, "m15_rate", "0.00|ms");
-			assertThatExists(server, prefix, "mean_rate", "|ms");
-			assertEquals(14, server.receivedMessages().size());
-		}
-	}
+    @Test
+    public void testExcludeFilter() throws Exception {
+        final int testUdpPort = 4445;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            ImmutableSet<String> excludes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeInt".split(","));
+            StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+            reporterFactory.setFormatter(formatter);
+            reporterFactory.setHost("localhost");
+            reporterFactory.setPort(testUdpPort);
+            reporterFactory.setExcludes(excludes);
+            StatsdReporter reporter = reporterFactory.build(null);
 
-	@Test
-	public void testExcludeFilter() throws Exception {
-		final int testUdpPort = 4445;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			ImmutableSet<String> excludes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeInt".split(","));
-			StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-			reporterFactory.setFormatter(formatter);
-			reporterFactory.setHost("localhost");
-			reporterFactory.setPort(testUdpPort);
-			reporterFactory.setExcludes(excludes);
-			StatsdReporter reporter = reporterFactory.build(null);
+            SortedMap<String, Gauge> gauges = new TreeMap<>();
+            gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
+            gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
 
-			SortedMap<String, Gauge> gauges = new TreeMap<>();
-			gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
-			gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
+            reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
 
-			reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
+            sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
 
-			sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
+            // Check that both gauge metrics were received and app id is dropped
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
+            assertFalse(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
+            assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
+            assertEquals(1, server.receivedMessages().size());
+        }
+    }
 
-			// Check that both gauge metrics were received and app id is dropped
-			assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
-			assertFalse(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
-			assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
-			assertEquals(1, server.receivedMessages().size());
+    @Test
+    public void testIncludeFilter() throws Exception {
+        final int testUdpPort = 4446;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            ImmutableSet<String> includes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeFloat".split(","));
+            StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+            reporterFactory.setFormatter(formatter);
+            reporterFactory.setHost("localhost");
+            reporterFactory.setPort(testUdpPort);
+            reporterFactory.setIncludes(includes);
+            StatsdReporter reporter = reporterFactory.build(null);
 
-		}
-	}
+            SortedMap<String, Gauge> gauges = new TreeMap<>();
+            gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
+            gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
 
-	@Test
-	public void testIncludeFilter() throws Exception {
-		final int testUdpPort = 4446;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			ImmutableSet<String> includes = ImmutableSet.copyOf("test-app-01.driver.TestGaugeFloat".split(","));
-			StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-			reporterFactory.setFormatter(formatter);
-			reporterFactory.setHost("localhost");
-			reporterFactory.setPort(testUdpPort);
-			reporterFactory.setIncludes(includes);
-			StatsdReporter reporter = reporterFactory.build(null);
+            reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
 
-			SortedMap<String, Gauge> gauges = new TreeMap<>();
-			gauges.put("test-app-01.driver.TestGaugeInt", () -> 42);
-			gauges.put("test-app-01.driver.TestGaugeFloat", () -> 123.123f);
+            sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
 
-			reporter.report(gauges, new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), new TreeMap<>());
+            // Check that both gauge metrics were received and app id is dropped
+            assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
+            assertFalse(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
+            assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
+            assertEquals(1, server.receivedMessages().size());
+        }
+    }
 
-			sleep(100); // Pausing to let DatagramTestServer collect all messages before the assertion
+    @Test
+    public void testAttributeExcludeFilter() throws Exception {
+        final int testUdpPort = 4447;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            EnumSet<MetricAttribute> excludesAttributes = EnumSet.copyOf(Arrays.asList(MetricAttribute.COUNT));
+            StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+            reporterFactory.setFormatter(formatter);
+            reporterFactory.setHost("localhost");
+            reporterFactory.setPort(testUdpPort);
+            reporterFactory.setExcludesAttributes(excludesAttributes);
+            StatsdReporter reporter = reporterFactory.build(null);
 
-			// Check that both gauge metrics were received and app id is dropped
-			assertTrue(server.receivedMessages().stream().allMatch(s -> s.startsWith("spark.driver.testgauge")));
-			assertFalse(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":42|g")));
-			assertTrue(server.receivedMessages().stream().anyMatch(s -> s.endsWith(":123.12|g")));
-			assertEquals(1, server.receivedMessages().size());
+            SortedMap<String, Meter> meters = new TreeMap<>();
+            Meter meter = new Meter();
+            meter.mark();
+            meter.mark(2);
+            meters.put("test-app-01.driver.TestMeter", meter);
 
-		}
-	}
+            reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
 
-	@Test
-	public void testAttributeExcludeFilter() throws Exception {
-		final int testUdpPort = 4447;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			EnumSet<MetricAttribute> excludesAttributes = EnumSet.copyOf(Arrays.asList(MetricAttribute.COUNT));
-			StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-			reporterFactory.setFormatter(formatter);
-			reporterFactory.setHost("localhost");
-			reporterFactory.setPort(testUdpPort);
-			reporterFactory.setExcludesAttributes(excludesAttributes);
-			StatsdReporter reporter = reporterFactory.build(null);
+            sleep(100);
 
-			SortedMap<String, Meter> meters = new TreeMap<>();
-			Meter meter = new Meter();
-			meter.mark();
-			meter.mark(2);
-			meters.put("test-app-01.driver.TestMeter", meter);
+            String prefix = "spark.driver.testmeter.";
+            assertThatNotExists(server, prefix, "count", "3|g");
+            assertThatExists(server, prefix, "m1_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m5_rate", "0.00|ms");
+            assertThatExists(server, prefix, "m15_rate", "0.00|ms");
+            // mean value depends on the timing and can't be predicted for the test
+            assertThatExists(server, prefix, "mean_rate", "|ms");
+            assertEquals(4, server.receivedMessages().size());
+        }
+    }
 
-			reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
+    @Test
+    public void testAttributeIncludeFilter() throws Exception {
+        final int testUdpPort = 4448;
+        try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
+            EnumSet<MetricAttribute> includesAttributes = EnumSet.copyOf(Arrays.asList(MetricAttribute.COUNT));
+            StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+            reporterFactory.setFormatter(formatter);
+            reporterFactory.setHost("localhost");
+            reporterFactory.setPort(testUdpPort);
+            reporterFactory.setIncludesAttributes(includesAttributes);
+            StatsdReporter reporter = reporterFactory.build(null);
 
-			sleep(100);
+            SortedMap<String, Meter> meters = new TreeMap<>();
+            Meter meter = new Meter();
+            meter.mark();
+            meter.mark(2);
+            meters.put("test-app-01.driver.TestMeter", meter);
 
-			String prefix = "spark.driver.testmeter.";
-			assertThatNotExists(server, prefix, "count", "3|g");
-			assertThatExists(server, prefix, "m1_rate", "0.00|ms");
-			assertThatExists(server, prefix, "m5_rate", "0.00|ms");
-			assertThatExists(server, prefix, "m15_rate", "0.00|ms");
-			// mean value depends on the timing and can't be predicted for the test
-			assertThatExists(server, prefix, "mean_rate", "|ms");
-			assertEquals(4, server.receivedMessages().size());
+            reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
 
-		}
-	}
+            sleep(100);
 
-	@Test
-	public void testAttributeIncludeFilter() throws Exception {
-		final int testUdpPort = 4448;
-		try (DatagramTestServer server = DatagramTestServer.run(testUdpPort)) {
-			EnumSet<MetricAttribute> includesAttributes = EnumSet.copyOf(Arrays.asList(MetricAttribute.COUNT));
-			StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-			reporterFactory.setFormatter(formatter);
-			reporterFactory.setHost("localhost");
-			reporterFactory.setPort(testUdpPort);
-			reporterFactory.setIncludesAttributes(includesAttributes);
-			StatsdReporter reporter = reporterFactory.build(null);
+            String prefix = "spark.driver.testmeter.";
+            assertThatExists(server, prefix, "count", "3|g");
+            assertThatNotExists(server, prefix, "m1_rate", "0.00|ms");
+            assertThatNotExists(server, prefix, "m5_rate", "0.00|ms");
+            assertThatNotExists(server, prefix, "m15_rate", "0.00|ms");
+            // mean value depends on the timing and can't be predicted for the test
+            assertThatNotExists(server, prefix, "mean_rate", "|ms");
+            assertEquals(1, server.receivedMessages().size());
+        }
+    }
 
-			SortedMap<String, Meter> meters = new TreeMap<>();
-			Meter meter = new Meter();
-			meter.mark();
-			meter.mark(2);
-			meters.put("test-app-01.driver.TestMeter", meter);
+    private StatsdReporter buildTestReporter(int testUdpPort) {
+        StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
+        reporterFactory.setFormatter(formatter);
+        reporterFactory.setHost("localhost");
+        reporterFactory.setPort(testUdpPort);
+        return reporterFactory.build(null);
+    }
 
-			reporter.report(new TreeMap<>(), new TreeMap<>(), new TreeMap<>(), meters, new TreeMap<>());
+    private void assertThatExists(DatagramTestServer server, String expectedMetricNamePrefix,
+            String expectedMetricArgumentName, String expectedValueAndType) {
+        assertTrue(server.receivedMessages().stream()
+                .anyMatch(s -> s.startsWith(expectedMetricNamePrefix + expectedMetricArgumentName)
+                        && s.endsWith(expectedValueAndType)));
+    }
 
-			sleep(100);
-
-			String prefix = "spark.driver.testmeter.";
-			assertThatExists(server, prefix, "count", "3|g");
-			assertThatNotExists(server, prefix, "m1_rate", "0.00|ms");
-			assertThatNotExists(server, prefix, "m5_rate", "0.00|ms");
-			assertThatNotExists(server, prefix, "m15_rate", "0.00|ms");
-			// mean value depends on the timing and can't be predicted for the test
-			assertThatNotExists(server, prefix, "mean_rate", "|ms");
-			assertEquals(1, server.receivedMessages().size());
-
-		}
-	}
-
-	private StatsdReporter buildTestReporter(int testUdpPort) {
-		StatsdReporterFactory reporterFactory = new StatsdReporterFactory();
-		reporterFactory.setFormatter(formatter);
-		reporterFactory.setHost("localhost");
-		reporterFactory.setPort(testUdpPort);
-		return reporterFactory.build(null);
-	}
-
-	private void assertThatExists(DatagramTestServer server, String expectedMetricNamePrefix,
-			String expectedMetricArgumentName, String expectedValueAndType) {
-		assertTrue(server.receivedMessages().stream()
-				.anyMatch(s -> s.startsWith(expectedMetricNamePrefix + expectedMetricArgumentName)
-						&& s.endsWith(expectedValueAndType)));
-	}
-
-	private void assertThatNotExists(DatagramTestServer server, String expectedMetricNamePrefix,
-			String expectedMetricArgumentName, String expectedValueAndType) {
-		assertFalse(server.receivedMessages().stream()
-				.anyMatch(s -> s.startsWith(expectedMetricNamePrefix + expectedMetricArgumentName)
-						&& s.endsWith(expectedValueAndType)));
-	}
+    private void assertThatNotExists(DatagramTestServer server, String expectedMetricNamePrefix,
+            String expectedMetricArgumentName, String expectedValueAndType) {
+        assertFalse(server.receivedMessages().stream()
+                .anyMatch(s -> s.startsWith(expectedMetricNamePrefix + expectedMetricArgumentName)
+                        && s.endsWith(expectedValueAndType)));
+    }
 }

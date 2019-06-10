@@ -58,7 +58,7 @@
       <exclusions>
         <exclusion>
           <groupId>io.dropwizard.metrics</groupId>
-	  <artifactId>metrics-core</artifactId>
+          <artifactId>metrics-core</artifactId>
         </exclusion>
         <exclusion>
           <groupId>io.dropwizard</groupId>
