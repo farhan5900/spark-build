@@ -30,7 +30,8 @@ public class StatsdReporterTest {
     public void setupFormatter() {
         InstanceDetailsProvider provider = Mockito.mock(InstanceDetailsProvider.class);
 
-        when(provider.getInstanceDetails()).thenReturn(Optional.of(new InstanceDetails("test-app-01", "Test Spark App",
+        when(provider.getInstanceDetails()).thenReturn(Optional.of(new InstanceDetails(
+                "test-app-01", "Test Spark App", "spark-test",
                 InstanceType.DRIVER, "test-instance-01", "default")));
         String[] tags = {};
         this.formatter = new MetricFormatter(provider, "spark", tags);
