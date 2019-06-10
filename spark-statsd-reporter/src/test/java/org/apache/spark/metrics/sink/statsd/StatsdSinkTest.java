@@ -17,7 +17,7 @@ public class StatsdSinkTest {
             MetricRegistry registry = new MetricRegistry();
 
             Properties props = new Properties(); // empty configuration
-            StatsdSink sink = new StatsdSink(props, registry, null);
+            StatsdSink sink = new StatsdSink(props, registry);
 
             // Report simple gauge metric
             registry.register("test_gauge", (Gauge<Integer>) () -> 1);
@@ -41,7 +41,7 @@ public class StatsdSinkTest {
             props.put(Configuration.Keys.PREFIX, "myprefix");
             props.put(Configuration.Keys.TAGS, "foo=bar");
 
-            StatsdSink sink = new StatsdSink(props, registry, null);
+            StatsdSink sink = new StatsdSink(props, registry);
 
             // Report simple gauge metric
             registry.register("test_gauge", (Gauge<Integer>) () -> 1);
